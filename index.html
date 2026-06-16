@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMT 面谈助手 — 调薪面谈记录工具 v2.1</title>
+<style>
+/* === CSS Variables === */
+:root {
+  --primary: #2563EB; --primary-hover: #1D4ED8; --primary-light: #EFF6FF;
+  --secondary: #3B82F6; --accent: #059669;
+  --bg: #F8FAFC; --fg: #0F172A; --card: #FFFFFF;
+  --muted: #F1F5FD; --muted-fg: #64748B; --border: #E4ECFC;
+  --sidebar-bg: #0F172A; --sidebar-text: #CBD5E1;
+  --sidebar-muted: #94A3B8; --sidebar-icon: #64748B;
+  --destructive: #DC2626;
+  --text-subtle: #475569; --text-secondary: #334155;
+  --font: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); background: var(--fg); overflow: hidden; width: 100vw; height: 100vh; }
+
+.app-wrapper {
+  position: relative; width: 1440px; height: 900px; margin: 0 auto;
+  transform-origin: top center;
+}
+
+/* ===== Screen Container ===== */
+.screen {
+  position: absolute; top: 0; left: 0; width: 1440px; height: 900px;
+  display: flex; background: var(--bg); overflow: hidden; opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+.screen.active { opacity: 1; pointer-events: auto; }
+
+/* ===== Sidebar ===== */
+.sidebar {
+  width: 240px; min-width: 240px; background: var(--sidebar-bg);
+  display: flex; flex-direction: column; padding: 24px; gap: 12px;
+}
+.sidebar-logo { color: #FFF; font-size: 20px; font-weight: 700; }
+.sidebar-divider { height: 1px; background: rgba(255,255,255,0.1); }
+.nav-item { display: flex; align-items: center; height: 44px; padding: 0 12px; gap: 8px; cursor: pointer; transition: background 0.15s; }
+.nav-item.active { background: var(--primary); }
+.nav-item:not(.active):hover { background: rgba(255,255,255,0.05); }
+.nav-icon { width: 20px; height: 20px; }
+.nav-item.active .nav-icon { background: #FFF; }
+.nav-item:not(.active) .nav-icon { background: var(--sidebar-icon); }
+.nav-text { font-size: 15px; font-weight: 400; flex: 1; }
+.nav-item.active .nav-text { color: #FFF; font-weight: 500; }
+.nav-item:not(.active) .nav-text { color: var(--sidebar-muted); }
+.sidebar-spacer { flex: 1; }
+.user-area { display: flex; align-items: center; height: 48px; padding: 8px; gap: 10px; }
+.avatar { width: 32px; height: 32px; border-radius: 9999px; background: var(--secondary); }
+.user-name { font-size: 14px; color: var(--sidebar-text); }
+
+/* ===== Main Content ===== */
+.main-content { flex: 1; display: flex; flex-direction: column; padding: 32px; gap: 24px; overflow-y: auto; }
+
+.header-bar { display: flex; align-items: center; justify-content: space-between; height: 56px; flex-shrink: 0; }
+.page-title { font-size: 28px; font-weight: 700; color: var(--fg); }
+.header-detail { display: flex; align-items: center; gap: 16px; }
+.btn-back { background: none; border: none; cursor: pointer; font-size: 14px; color: var(--primary); font-family: var(--font); font-weight: 500; }
+.btn-back:hover { text-decoration: underline; }
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px;
+  font-size: 15px; font-weight: 500; cursor: pointer; border: none; outline: none;
+  font-family: var(--font); transition: background 0.15s;
+}
+.btn-primary { height: 44px; min-width: 140px; background: var(--primary); color: #FFF; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-sm { height: 32px; min-width: 80px; font-size: 13px; }
+.btn-outline { height: 32px; min-width: 80px; font-size: 13px; background: none; border: 1px solid var(--border); color: var(--primary); }
+.btn-outline:hover { background: var(--muted); }
+.btn-icon { width: 18px; height: 18px; background: #FFF; }
+
+/* ===== Stats Row ===== */
+.stats-row { display: flex; gap: 20px; height: 100px; flex-shrink: 0; }
+.stat-card { flex: 1; background: var(--card); display: flex; flex-direction: column; padding: 20px; gap: 8px; }
+.stat-label { font-size: 13px; color: var(--muted-fg); }
+.stat-value { font-size: 32px; font-weight: 700; color: var(--fg); }
+
+/* ===== Filter Bar ===== */
+.filter-bar { display: flex; align-items: center; gap: 16px; height: 48px; flex-shrink: 0; }
+.search-box { display: flex; align-items: center; width: 320px; height: 44px; background: var(--card); padding: 0 12px; gap: 8px; }
+.search-icon { width: 18px; height: 18px; background: var(--sidebar-muted); }
+.search-input { flex: 1; font-size: 14px; color: var(--fg); border: none; outline: none; background: none; font-family: var(--font); }
+.search-input::placeholder { color: var(--sidebar-muted); }
+.filter-spacer { flex: 1; }
+
+/* ===== Record List ===== */
+.record-list { flex: 1; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.list-header { display: flex; align-items: center; height: 44px; padding: 0 12px; gap: 16px; flex-shrink: 0; }
+.list-col { font-size: 12px; font-weight: 500; color: var(--muted-fg); }
+.col-name { width: 140px; } .col-dept { width: 160px; } .col-date { width: 160px; } .col-status { width: 80px; } .col-note { flex: 1; }
+
+.record-card {
+  display: flex; align-items: center; height: 64px; padding: 0 12px; gap: 16px;
+  background: var(--card); cursor: pointer; flex-shrink: 0; transition: background 0.15s;
+}
+.record-card:hover { background: var(--muted); }
+.name-block { display: flex; flex-direction: column; width: 140px; gap: 2px; }
+.name-edit {
+  display: flex; align-items: center; gap: 6px; cursor: text;
+}
+.name-edit input {
+  border: none; outline: none; font-size: 15px; font-weight: 500; font-family: var(--font);
+  color: var(--fg); background: transparent; width: 100%; padding: 0;
+  border-bottom: 2px solid transparent; transition: border-color 0.2s;
+}
+.name-edit input:focus { border-bottom-color: var(--primary); }
+.name-edit input:hover:not(:focus) { border-bottom-color: var(--border); }
+.edit-icon {
+  display: none; width: 12px; height: 12px; background: var(--sidebar-muted);
+  flex-shrink: 0; cursor: pointer;
+}
+.name-edit:hover .edit-icon { display: block; }
+.record-dept { font-size: 12px; color: var(--sidebar-muted); width: 160px; display: flex; align-items: center; }
+.record-dept input {
+  border: none; outline: none; font-size: 12px; font-family: var(--font); color: var(--sidebar-muted);
+  background: transparent; width: 100%; padding: 0; border-bottom: 2px solid transparent;
+}
+.record-dept input:focus { border-bottom-color: var(--primary); }
+.record-date { font-size: 14px; color: var(--text-secondary); width: 160px; }
+.record-date input {
+  border: none; outline: none; font-size: 14px; font-family: var(--font); color: var(--text-secondary);
+  background: transparent; width: 100%; padding: 0; border-bottom: 2px solid transparent;
+}
+.record-date input:focus { border-bottom-color: var(--primary); }
+.status-select {
+  width: 90px; height: 30px; padding: 2px 4px; font-size: 12px; font-weight: 500; font-family: var(--font);
+  border: 1px solid var(--border-color); border-radius: 4px; outline: none; cursor: pointer;
+  background: #fff; color: var(--text-primary); text-align: center;
+  -webkit-appearance: none; appearance: none;
+}
+.status-select:focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-light); }
+.record-note { flex: 1; min-width: 0; }
+.record-note input {
+  width: 100%; border: none; outline: none; font-size: 14px; font-family: var(--font);
+  color: var(--text-subtle); background: transparent; padding: 2px 0;
+  border-bottom: 1px solid transparent; transition: border-color 0.15s;
+}
+.record-note input:focus { border-bottom-color: var(--primary); color: var(--text-primary); }
+.record-check {
+  width: 18px; height: 18px; margin-right: 8px; flex-shrink: 0;
+  accent-color: var(--primary); cursor: pointer;
+}
+.btn-delete {
+  width: 28px; height: 28px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; color: var(--sidebar-muted); border-radius: 0;
+  transition: all 0.15s;
+}
+.btn-delete:hover { color: var(--destructive); background: #FEF2F2; }
+
+/* ===== Detail Panel ===== */
+.detail-panel {
+  flex: 1; display: flex; flex-direction: column; overflow-y: auto; gap: 20px;
+  padding: 0 0 24px 0;
+}
+.detail-section {
+  background: var(--card); display: flex; flex-direction: column; padding: 24px; gap: 16px;
+}
+.detail-section-title {
+  font-size: 18px; font-weight: 700; color: var(--fg);
+  border-bottom: 2px solid var(--border); padding-bottom: 12px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.detail-table { width: 100%; border-collapse: collapse; }
+.detail-table td {
+  padding: 10px 12px; font-size: 14px; vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+.detail-table td:first-child { width: 160px; color: var(--muted-fg); font-weight: 500; white-space: nowrap; }
+.detail-table td:last-child { color: var(--fg); }
+.detail-table td textarea, .detail-table td input[type="text"] {
+  width: 100%; border: 1px solid transparent; outline: none; font-size: 14px;
+  font-family: var(--font); color: var(--fg); background: var(--bg); padding: 6px 8px;
+  resize: vertical; min-height: 28px;
+}
+.detail-table td textarea:focus, .detail-table td input[type="text"]:focus { border-color: var(--primary); }
+.detail-table td .readonly-text { padding: 6px 8px; white-space: pre-wrap; line-height: 1.6; min-height: 28px; }
+
+.action-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 0; gap: 12px; position: sticky; bottom: 0; background: var(--bg);
+}
+.btn-group { display: flex; gap: 12px; }
+
+.info-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.info-item { display: flex; flex-direction: column; gap: 4px; }
+.info-label { font-size: 12px; color: var(--muted-fg); font-weight: 500; }
+.info-value { font-size: 14px; color: var(--fg); padding: 6px 8px; background: var(--bg); min-height: 32px; border: 1px solid transparent; }
+.info-value:focus { border-color: var(--primary); outline: none; }
+.info-value-readonly { font-size: 14px; color: var(--fg); padding: 6px 8px; min-height: 32px; }
+
+.followup-list { display: flex; flex-direction: column; gap: 8px; }
+.followup-item {
+  display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.followup-item:last-child { border-bottom: none; }
+.followup-task { flex: 1; font-size: 14px; color: var(--fg); }
+.followup-person { width: 120px; font-size: 14px; color: var(--fg); }
+.followup-date { width: 100px; font-size: 14px; color: var(--fg); }
+.followup-status { width: 60px; text-align: center; }
+.followup-checkbox { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
+
+/* checkbox/radio option groups */
+.chk-group { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; min-height: 28px; }
+.chk-option { font-size: 14px; color: var(--muted-fg); }
+.chk-option.chk-sel { color: var(--fg); font-weight: 500; }
+.chk-label { display: flex; align-items: center; gap: 4px; font-size: 14px; cursor: pointer; color: var(--fg); user-select: none; }
+.chk-label input[type="radio"] { accent-color: var(--primary); width: 16px; height: 16px; margin: 0; }
+
+/* Hints */
+.hint-tag {
+  font-size: 12px; font-weight: 400; color: var(--primary);
+  cursor: pointer; margin-left: 12px; user-select: none;
+  white-space: nowrap;
+}
+.hint-tag:hover { text-decoration: underline; }
+.hint-detail {
+  font-size: 13px; color: var(--muted-fg); line-height: 1.6;
+  padding: 12px 16px; margin-bottom: 8px;
+  background: var(--primary-light); border-left: 3px solid var(--primary);
+}
+.hint-inline {
+  display: block; font-size: 12px; color: var(--sidebar-muted);
+  margin-top: 4px; font-style: italic;
+}
+
+.edit-input {
+  border: none; border-bottom: 2px solid transparent; outline: none;
+  font-size: 14px; font-family: var(--font); color: var(--fg); background: transparent;
+  padding: 2px 0; width: 100%;
+}
+.edit-input:focus { border-bottom-color: var(--primary); }
+
+/* ===== Modal Overlay ===== */
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--bg); width: 1100px; max-height: 85vh; border-radius: 0;
+  display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px; border-bottom: 2px solid var(--border); background: var(--card);
+}
+.modal-title { font-size: 20px; font-weight: 700; color: var(--fg); }
+.modal-close {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 22px; color: var(--muted-fg); background: none; border: none;
+}
+.modal-close:hover { background: var(--muted); color: var(--fg); }
+.modal-body { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+.modal-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px; border-top: 2px solid var(--border); background: var(--card);
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); }
+::-webkit-scrollbar-thumb:hover { background: var(--sidebar-muted); }
+
+/* ===== Toast ===== */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--fg); color: #FFF; padding: 12px 24px; font-size: 14px;
+  font-family: var(--font); opacity: 0; transition: opacity 0.3s; z-index: 2000;
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="app-wrapper" id="app">
+
+  <!-- ======================== SCREEN 1: Record List ======================== -->
+  <div class="screen active" id="screen-list">
+    <div class="sidebar">
+      <div class="sidebar-logo">SMT 面谈助手</div>
+      <div class="sidebar-divider"></div>
+      <div class="nav-item active" data-target="list">
+        <div class="nav-icon"></div><span class="nav-text">谈话记录</span>
+      </div>
+      <div class="nav-item" data-target="form" onclick="openNewRecord()">
+        <div class="nav-icon"></div><span class="nav-text">新建谈话</span>
+      </div>
+      <div class="sidebar-spacer"></div>
+        <div class="user-area">
+        <div class="avatar"></div><span class="user-name">SMT财务</span>
+      </div>
+    </div>
+    <div class="main-content">
+      <div class="header-bar">
+        <span class="page-title">谈话记录</span>
+        <div class="btn-group">
+          <button class="btn btn-outline btn-sm" onclick="toggleSelectAll()" style="height:44px;margin-right:4px;" id="btnSelectAll">全选</button>
+          <button class="btn btn-outline btn-sm" onclick="exportSelected()" style="height:44px;margin-right:4px;">导出选中</button>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()" style="height:44px;margin-right:4px;">导入</button>
+          <input type="file" id="importFile" accept=".json" style="display:none" onchange="importSelected(this)">
+          <button class="btn btn-primary" onclick="openNewRecord()"><div class="btn-icon"></div><span>新建谈话</span></button>
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><span class="stat-label">谈话总数</span><span class="stat-value">10</span></div>
+        <div class="stat-card"><span class="stat-label">待访谈</span><span class="stat-value">1</span></div>
+        <div class="stat-card"><span class="stat-label">进行中</span><span class="stat-value">0</span></div>
+        <div class="stat-card"><span class="stat-label">已完成</span><span class="stat-value">9</span></div>
+      </div>
+      <div class="filter-bar">
+        <div class="search-box">
+          <div class="search-icon"></div>
+          <input class="search-input" placeholder="搜索员工姓名或岗位..." oninput="filterRecords()" id="searchInput">
+        </div>
+        <div class="filter-spacer"></div>
+      </div>
+      <div class="list-header">
+        <span class="list-col col-name">员工姓名</span>
+        <span class="list-col col-dept">所在岗位</span>
+        <span class="list-col col-date">对应主体</span>
+        <span class="list-col col-status">状态</span>
+        <span class="list-col col-note">关键摘要</span>
+      </div>
+      <div class="record-list" id="recordList"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== Detail Modal ===== -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">访谈记录</span>
+      <button class="modal-close" onclick="closeDetail()">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer">
+      <span style="font-size:12px;color:var(--muted-fg);" id="modalInfo"></span>
+      <div class="btn-group">
+        <button class="btn btn-primary btn-sm" id="btnEditSave" onclick="toggleEditMode()">编辑</button>
+        <button class="btn btn-outline btn-sm" style="display:none;" id="btnCancel" onclick="cancelEdit()">取消</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Toast ===== -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ==============================
+// DATA: 5 Employee Interview Records
+// ==============================
+let EMPLOYEES = [
+  {
+    id: 1,
+    name: '付治秀', dept: '财务核算岗（海外子公司）', entities: '巴西、新加坡、土耳其',
+    date: '2026-06-08', status: '已完成', statusType: 'done',
+    summary: '三线并行海外核算，巴西5月结账提前半月，土耳其内控严重缺失需重点推进',
+    basicInfo: {
+      interviewer: '韩毅',
+      currentSalary: '', lastAdjust: '', proposedAdjust: '上浮 %，调整后薪资：'
+    },
+    performance: {
+      core: '1. 巴西全盘——资料收集、审批管理、财务核算、成本管控、审计配合；2. 新加坡全盘——资料收集、审批管理、财务核算、成本管控（运行良好，问题少）；3. 土耳其全盘——资料收集、审批管理、财务核算、成本管控',
+      highlights: '1. 巴西5月招财务后结账出报表时间提前半个月，推动效果明显；2. 新加坡几乎无问题，资料按时提交、审计配合度高；3. 主动推动巴西/土耳其内控流程——OA操作方法已发助理学习、签收单模板已发送、审批流程已设置；4. 成本管控意识强——反复强调存货盘点、投放仪器台账管理',
+      improvements: '1. 巴西资料延迟（10-15号），实习生疏忽不检查完整性；2. 土耳其严重延迟——25号才能完整提供资料，负责人应答不及时；3. 巴西账实不符反复发生，数量差异大，库房管控不严；4. 土耳其2025年底盘点账实差异大，投放/样机/赠品未申报；5. 巴西/土耳其付款审批后补情况普遍，存在未走审批的付款；6. 土耳其销售内控资料严重缺失（合同、订单截图、签收单），9月才开始销售',
+      collaboration: '与巴西财务Vinicius、巴西负责人、新加坡助理/颜总、土耳其负责人/助理多线沟通，存在时差+语言+文化多重障碍'
+    },
+    career: { achievement:'', skills:'', direction:'', depth:'', willing:'', draining:'', resource:'', strengthQ:'', improveQ:'', supportQ:'' },
+    companyMsg: {
+      strategy: '2026年IPO关键年，海外子公司内控合规和销售单证完整性是审计重点',
+      teamExpectation: '海外资料提交时效强制化、库存管理规范化、内控资料闭环',
+      positioning: '巴/新/土海外核算核心岗，三国财务合规守门人'
+    },
+    workAdjust: {
+      before: '巴西/新加坡/土耳其：资料收集、审批管理、财务核算、成本管控、审计配合',
+      after: '维持三线，强化时效强制管理和内控闭环',
+      newDuties: '1. 推行"次月1日前提交全部资料"强制时限（新加坡已达标，巴西/土耳其待整改）；2. 巴西——建议财务Vinicius检查实习生提交资料的完整性和准确性，每月底与库管联合盘点；3. 土耳其——要求助理按模板提交签收单、合同上传OA、ERP尽快上线不再拖延；4. 建立"超时未提交=升级汇报"机制，对屡次延迟的国家向管理层反馈；5. 所有付款审批前置，每月检查是否有未走审批的付款',
+      removed: '—（暂无明显调整，但工作量需评估是否过载）',
+      boundary: '海外资料时效——当地财务/负责人为主责，付治秀负责督促+超时升级；存货管理——当地库管负责实物+ERP，财务远程核算+差异追踪；审批流程——当地负责人确保所有付款走审批，助理负责提交',
+      contacts: '巴西财务Vinicius、巴西负责人；新加坡助理、颜总；土耳其负责人、土耳其助理',
+      feedback: '□ 接受 □ 有顾虑 □ 抵触',
+      concern: '', resolution: ''
+    },
+    salary: { finalRate:'', effectiveDate:'', adjustedSalary:'', feedback:'□ 接受 □ 低于预期 □ 需后续沟通', notes:'三线并行+多时区沟通，工作量和管理复杂度极高' },
+    followup: [
+      { task:'发出书面调薪确认', person:'', date:'', done:false },
+      { task:'发出调整后职责说明', person:'', date:'', done:false },
+      { task:'巴西"次月1日"资料时效达成', person:'', date:'', done:false },
+      { task:'土耳其"次月1日"资料时效达成', person:'', date:'', done:false },
+      { task:'土耳其销售内控资料补齐', person:'', date:'', done:false },
+      { task:'巴西库房4月整改验收', person:'', date:'2026.04', done:false },
+      { task:'1个月后回访', person:'', date:'', done:false }
+    ],
+    summary2: {
+      overallState: '□ 积极 □ 稳定 □ 迷茫 □ 消极',
+      clarity: '□ 清晰 □ 有方向但模糊 □ 不明确',
+      acceptance: '□ 高 □ 中 □ 低',
+      focus: '',
+      risk: '土耳其是最大风险点——负责人响应差、资料严重延迟、内控几乎空白、销售9月才起步；巴西库房整改4月验收，若失败将直接影响IPO存货审计；三项海外沟通均有时差障碍，长期消耗精力',
+      notes: ''
+    }
+  },
+  {
+    id: 2,
+    name: '杨丽', dept: '财务管理岗（税务/薪资/综合管理）', entities: '斯马特、普利泰、成都诊断',
+    date: '2026-06-12', status: '进行中', statusType: 'active',
+    summary: '税务与财务管理核心岗，IPO合规关键人，业财协同机制待建设',
+    basicInfo: { interviewer: '韩毅', currentSalary:'', lastAdjust:'', proposedAdjust:'上浮 %，调整后薪资：' },
+    performance: {
+      core: '1. 基础核算（2025.4前已交接）；2. 财务管理：指导3位新同事熟悉费用/收入成本/税务申报；协同各部门调整业务架构保障税收优惠；完成税务局实地核查+8项税务自查；配合领导完成政策研究（西部大开发、高新指标、研发加计、关联交易定价、企业所得税/增值税/个税法）；对接税务顾问+2次凭证审查；3. 薪资核算：3家公司工资+借调分摊+年终奖+国际/国内动医提成复核；4. 税务申报/报表；5. 资料填报',
+      highlights: '1. 承担最具管理属性和战略性的工作；2. 主动梳理国际动医提成表标准化方案；3. 主动提出建立税务自查与核查标准化手册；4. 主动推动ERP系统关联交易价格管控；5. 主动推动申报数据归档体系建设；6. 业务架构调整期间协同各部门保障税收优惠——体现业财融合能力',
+      improvements: '1. 税务自查尚未形成系统化手册；2. 业务转移时业财协同不足——产线/原材料转移至成都诊断时未通知财务；3. 关联交易定价不规范；4. 仪器产品材料费不能ERP自动取数；5. 报表数据填报费时',
+      collaboration: '跨部门覆盖面最广——采购、生产、销售、售后、信息技术部均有对接；指导3位新同事'
+    },
+    career: { achievement:'', skills:'', direction:'', depth:'', willing:'', draining:'', resource:'', strengthQ:'', improveQ:'', supportQ:'' },
+    companyMsg: {
+      strategy: '2026年IPO关键年，税务合规是核心审核领域；业财协同机制是组织能力建设重点',
+      teamExpectation: '税务风险预防体系化、IPO资料准备系统化、跨部门财税协同常态化',
+      positioning: '税务与财务管理核心岗，IPO财务合规关键人，团队专业能力建设骨干'
+    },
+    workAdjust: {
+      before: '基础核算（已交接）+ 财务管理 + 薪资核算 + 税务申报/报表 + 资料填报',
+      after: '聚焦：税务管理 + 薪资核算 + IPO配合，基础核算不再承担',
+      newDuties: '1. 建立税务自查与核查标准化手册；2. 推进申报数据归档体系；3. ERP系统关联交易价格管控落地；4. IPO税务资料系统化准备；5. 业财协同机制建设——推动业务变更前财务前置审核流程；6. 斯马特出口退税"配套出口"落地、成都诊断首单出口退税申报',
+      removed: '斯马特/成都诊断基础核算（2025.4已完成交接）；国际/国内动医提成表复核——标准化后逐步移交',
+      boundary: '业务架构变更——业务部门需提前通知财务评估税务影响；关联价格——财务维护基准价，系统管控禁止手工填价，信息技术部开发；薪资数据——前端部门按时准确提供，数据准确性纳入考核',
+      contacts: '采购/生产/销售/售后/信息技术部各负责人；税务顾问；国际动医各大区',
+      feedback: '□ 接受 □ 有顾虑 □ 抵触', concern: '', resolution: ''
+    },
+    salary: { finalRate:'', effectiveDate:'', adjustedSalary:'', feedback:'□ 接受 □ 低于预期 □ 需后续沟通', notes:'杨丽在团队中承担最多管理性、战略性工作，是IPO合规的关键人物' },
+    followup: [
+      { task:'发出书面调薪确认', person:'', date:'', done:false },
+      { task:'发出调整后职责说明', person:'', date:'', done:false },
+      { task:'税务自查标准化手册完成', person:'', date:'', done:false },
+      { task:'申报数据归档体系建立', person:'', date:'', done:false },
+      { task:'ERP价格管控上线', person:'', date:'', done:false },
+      { task:'斯马特出口退税"配套出口"落地', person:'', date:'', done:false },
+      { task:'成都诊断首单出口退税申报', person:'', date:'', done:false },
+      { task:'1个月后回访', person:'', date:'', done:false }
+    ],
+    summary2: {
+      overallState:'□ 积极 □ 稳定 □ 迷茫 □ 消极', clarity:'□ 清晰 □ 有方向但模糊 □ 不明确',
+      acceptance:'□ 高 □ 中 □ 低', focus:'',
+      risk:'业财协同不畅通是最大风险——产线转移未通知财务事件可能重演；IPO压力集中在2026年，税务合规责任重大', notes:''
+    }
+  },
+  {
+    id: 3,
+    name: '吴美林', dept: '财务核算岗（宠物医院+海外子公司）', entities: '宠物医院、俄罗斯子公司、埃及子公司',
+    date: '2026-06-05', status: '已完成', statusType: 'done',
+    summary: '覆盖最广的核算岗，宠物医院+俄埃三国全盘，存货整改和跨境沟通为重点',
+    basicInfo: { interviewer: '韩毅', currentSalary:'', lastAdjust:'', proposedAdjust:'上浮 %，调整后薪资：' },
+    performance: {
+      core: '1. 宠物医院全盘核算——经营数据统计、费用审核、供应商清理、成本核算、税务申报、报表出具；2. 俄罗斯子公司全盘；3. 埃及子公司全盘',
+      highlights: '1. 覆盖面最广——国内+2个海外子公司3个独立业务单元；2. 主动梳理宠物医院存货差异根源，提出系统性整改方案；3. 主动梳理宠物医院供应商往来混乱问题；4. 主动推动宠物医院系统开发客户充值余额统计功能；5. 提出中埃财务季度视频会议机制；6. 俄罗斯/埃及销售单证缺失已建立月度检查+反馈机制',
+      improvements: '1. 宠物医院存货差异反复发生，整改尚未闭环；2. 宠物医院系统充值统计功能3月底前需上线；3. 俄罗斯会计师往来差异处理缓慢；4. 埃及数据严重延迟——银行流水翻译版20号才能提供；5. 埃及试剂盘合同缺失、签收单未上传OA',
+      collaboration: '与俄罗斯负责人/会计师、埃及负责人/翻译、宠物医院仓管/院长/小冉总多线沟通'
+    },
+    career: { achievement:'', skills:'', direction:'', depth:'', willing:'', draining:'', resource:'', strengthQ:'', improveQ:'', supportQ:'' },
+    companyMsg: {
+      strategy: '2026年IPO关键年，海外子公司内控合规、存货管理规范、收入确认准确是重点',
+      teamExpectation: '海外核算闭环管理、存货账实一致、销售单证完整',
+      positioning: '宠物医院+俄埃海外核算核心岗，跨境财务沟通枢纽'
+    },
+    workAdjust: {
+      before: '宠物医院全盘 + 俄罗斯全盘 + 埃及全盘 + 审计配合',
+      after: '维持三条线，强化内控闭环和时效管理',
+      newDuties: '1. 宠物医院——每月抽盘重点存货，差异即查即调，每季度归总差异原因；2. 俄罗斯——要求往来差异当月处理完毕，建立勾稽核对机制；3. 埃及——推动月度存货结存数据按时提供，启动季度视频会议；4. 研究俄罗斯/埃及当地会计准则，建立与中国准则对比分析',
+      removed: '—（暂无明显调整，但需关注工作量是否过载）',
+      boundary: '宠物医院存货——仓管负责实物+系统操作，财务负责监盘+差异追踪；俄罗斯/埃及数据时效——海外负责人为主责，财务负责督促+反馈；供应商往来——任院长对接采购对账，财务生成核对明细表',
+      contacts: '宠物医院仓管（白刘昕）、院长（任院长）、小冉总；俄罗斯负责人、俄罗斯会计师；埃及负责人、埃及翻译、埃及会计师',
+      feedback: '□ 接受 □ 有顾虑 □ 抵触', concern: '', resolution: ''
+    },
+    salary: { finalRate:'', effectiveDate:'', adjustedSalary:'', feedback:'□ 接受 □ 低于预期 □ 需后续沟通', notes:'工作量极重——3个独立业务单元全盘，涉及4种语言沟通' },
+    followup: [
+      { task:'发出书面调薪确认', person:'', date:'', done:false },
+      { task:'发出调整后职责说明', person:'', date:'', done:false },
+      { task:'宠物医院系统充值统计功能上线', person:'', date:'2026.03', done:false },
+      { task:'中埃季度视频会议机制启动', person:'', date:'', done:false },
+      { task:'俄罗斯月度勾稽核对机制建立', person:'', date:'', done:false },
+      { task:'1个月后回访', person:'', date:'', done:false }
+    ],
+    summary2: {
+      overallState:'□ 积极 □ 稳定 □ 迷茫 □ 消极', clarity:'□ 清晰 □ 有方向但模糊 □ 不明确',
+      acceptance:'□ 高 □ 中 □ 低', focus:'',
+      risk:'工作量过载是最大风险——3个独立业务单元全盘+多语言沟通；埃及数据严重延迟（20号）持续挤压结账时间；俄罗斯会计师配合度差，历史差异越积越多', notes:''
+    }
+  },
+  {
+    id: 4,
+    name: '罗羚榕', dept: '财务核算岗（海外子公司）', entities: '泰国、德国公司',
+    date: '2026-06-03', status: '已完成', statusType: 'done',
+    summary: '泰国/德国全盘核算，主动推动仓库整改和签收单电子化，德国合同补签为难点',
+    basicInfo: { interviewer: '韩毅', currentSalary:'', lastAdjust:'', proposedAdjust:'上浮 %，调整后薪资：' },
+    performance: {
+      core: '1. 泰国/德国子公司全盘账务；2. 完成海外公司年度审计配合；3. 完成德国/泰国2025年1-10月销售单证OA上传；4. 斯马特成本核算（已平稳交接）',
+      highlights: '1. 主动推动德国仓库混乱问题——仓库主管被辞退后，改为李昌建管理；2. 推动意大利仓库改由司海洋管理，解决出入库管控问题；3. 推动2026年起UPS物流收货时客户电子签字，解决签收单缺失；4. 提出费用单据分2次提交方案（22号+月初2号），优化德国结账时效',
+      improvements: '1. 德国/泰国子公司数据延迟——泰国4-5号、德国5号提交流水；2. 德国意大利/西班牙仓库账实差异大，样品试剂盘和试用仪器未及时出库；3. 泰国试用机无明细台账；4. 德国直销客户合同缺失、2025年签收单全部缺失',
+      collaboration: '与海外子公司负责人、仓库管理人员高频沟通，推动流程改善'
+    },
+    career: { achievement:'', skills:'', direction:'', depth:'', willing:'', draining:'', resource:'', strengthQ:'', improveQ:'', supportQ:'' },
+    companyMsg: {
+      strategy: '2026年IPO辅导关键年，海外子公司内控合规、销售单证完整是重点',
+      teamExpectation: '海外核算规范化、结账时效压缩、内控资料闭环',
+      positioning: '海外子公司核算核心岗，德国/泰国财务全盘负责人'
+    },
+    workAdjust: {
+      before: '斯马特成本核算（已交接）+ 泰国/德国全盘（收款/应收应付/费用/成本/报表/审计）',
+      after: '聚焦泰国/德国全盘核算 + IPO审计配合',
+      newDuties: '1. 推动德国仓库月末盘点+账实差异调整常态化；2. 建立德国/泰国试用机和投放仪器明细台账；3. 推动子公司数据提交时效——泰国1-2号、德国分2次提交；4. 补齐德国直销客户合同及签收单',
+      removed: '斯马特成本核算（2025.11已交接）',
+      boundary: '海外仓库管理——仓库主管负责实物及ERP录入，财务负责核算核查与差异追踪；德国客户合同缺失——业务端推动补签，财务提供模板和要求',
+      contacts: '李昌建（德国仓库）、司海洋（意大利仓库）、泰国库管、德国/泰国负责人',
+      feedback: '□ 接受 □ 有顾虑 □ 抵触', concern: '', resolution: ''
+    },
+    salary: { finalRate:'', effectiveDate:'', adjustedSalary:'', feedback:'□ 接受 □ 低于预期 □ 需后续沟通', notes:'斯马特成本核算交接后，工作重心已从国内转向海外，职责范围变化较大' },
+    followup: [
+      { task:'发出书面调薪确认', person:'', date:'', done:false },
+      { task:'发出调整后职责说明', person:'', date:'', done:false },
+      { task:'德国仓库月末盘点机制落地', person:'', date:'', done:false },
+      { task:'试用机/投放仪器台账建立', person:'', date:'', done:false },
+      { task:'德国客户合同及签收单补齐', person:'', date:'', done:false },
+      { task:'1个月后回访', person:'', date:'', done:false }
+    ],
+    summary2: {
+      overallState:'□ 积极 □ 稳定 □ 迷茫 □ 消极', clarity:'□ 清晰 □ 有方向但模糊 □ 不明确',
+      acceptance:'□ 高 □ 中 □ 低', focus:'',
+      risk:'德国仓库混乱历史遗留问题大、意大利/西班牙仓库账实差异待解决；德国直销客户合同缺失量大，补签工作量巨大', notes:''
+    }
+  },
+  {
+    id: 5,
+    name: '陈思绮', dept: '财务核算岗（多主体/多模块）', entities: '斯马特、普利泰、成都诊断、深圳、波兰',
+    date: '2026-06-10', status: '已完成', statusType: 'done',
+    summary: '覆盖主体最广（5+海外），聚焦采购核算优化+出口退税+波兰全盘，深圳已交接',
+    basicInfo: { interviewer: '韩毅', currentSalary:'', lastAdjust:'', proposedAdjust:'上浮 %，调整后薪资：' },
+    performance: {
+      core: '1. 斯马特/成都诊断/普利泰采购核算及供应商对账；2. 深圳账务全流程核算（2025.10前）；3. 国外销售收入确认及出口退税申报；4. 波兰子公司全盘账务处理及档案管理；5. 配合审计提供核查资料',
+      highlights: '1. 覆盖主体最广（5家主体+海外），涉及模块最多（采购、销售、税务、审计、海外）；2. 主动梳理血细胞深圳代发业务流程问题，提出企微群沟通+留档方案；3. 主动跟进出口退税业务类型更正（集团采购→配套出口），配合税务核查；4. 波兰投放台账数据主动整理中',
+      improvements: '1. 采购发票入账跨期严重——需建立跟踪机制；2. 在建工程/固定资产收票周期长，缺乏专项跟踪台账；3. 波兰销售内控资料推进缓慢；4. 波兰档案管理未落地',
+      collaboration: '跨部门介入较多——与采购部门沟通发票规范、与深圳业务端沟通订单流程、与波兰负责人沟通内控'
+    },
+    career: { achievement:'', skills:'', direction:'', depth:'', willing:'', draining:'', resource:'', strengthQ:'', improveQ:'', supportQ:'' },
+    companyMsg: {
+      strategy: '2026年IPO辅导关键年，财务核算规范化和内控资料完整性是重点',
+      teamExpectation: '核算及时性提升、跨主体流程标准化',
+      positioning: '多主体核算核心岗，承担最广的核算覆盖面'
+    },
+    workAdjust: {
+      before: '采购核算（3家）、深圳全盘（已交接）、国外销售+出口退税、波兰全盘、审计配合',
+      after: '聚焦：采购核算优化 + 出口退税 + 波兰全盘 + 审计配合（深圳已交接）',
+      newDuties: '1. 建立在建工程/固定资产专项发票跟踪台账；2. 推动波兰内控资料落地（合同、签收单）；3. 出口退税软件化方案研究',
+      removed: '深圳账务核算（2025.11已完成交接）',
+      boundary: '采购发票时效——财务负责督促+跟踪，采购部门负责按时提交；波兰内控资料——财务指导+配合，波兰业务负责人为主责',
+      contacts: '采购部门负责人、波兰负责人、深圳业务端、杨丽（税务）',
+      feedback: '□ 接受 □ 有顾虑 □ 抵触', concern: '', resolution: ''
+    },
+    salary: { finalRate:'', effectiveDate:'', adjustedSalary:'', feedback:'□ 接受 □ 低于预期 □ 需后续沟通', notes:'' },
+    followup: [
+      { task:'发出书面调薪确认', person:'', date:'', done:false },
+      { task:'发出调整后职责说明', person:'', date:'', done:false },
+      { task:'在建工程/固定资产发票台账建立', person:'', date:'', done:false },
+      { task:'波兰内控资料推进', person:'', date:'', done:false },
+      { task:'1个月后回访', person:'', date:'', done:false }
+    ],
+    summary2: {
+      overallState:'□ 积极 □ 稳定 □ 迷茫 □ 消极', clarity:'□ 清晰 □ 有方向但模糊 □ 不明确',
+      acceptance:'□ 高 □ 中 □ 低', focus:'',
+      risk:'波兰内控资料长期推不动，需部门负责人层面介入；出口退税业务类型更正经税务实地核查，需关注', notes:''
+    }
+  },
+  {
+    id: 6,
+    name: '曹铃雪', dept: '资金管理岗（银行账户/外汇/贷款）', entities: '斯马特、普利泰、成都诊断',
+    date: '2026-06-15', status: '已完成', statusType: 'done',
+    summary: '资金管理核心岗，独立负责银行/外汇/贷款三条线，贷款全流程自主管理',
+    basicInfo: {
+      interviewer: '袁红', currentSalary: '', lastAdjust: '', proposedAdjust: ''
+    },
+    performance: {
+      core: '1. 完成2025年各期银行对账、资金报表与销售回款报表；2. 按计划完成银行账户撤销、变更及新增；3. 完成全年流动资金贷款续贷与新增；4. 完成各期贷款本息归还及贷后审查',
+      highlights: '1. 俄罗斯外汇入账报文问题主动跟进，已推动银行更正报文解决；2. 外汇单证资料问题主动与业务沟通规范，减少后续返工；3. 贷款业务全流程自主管理，从产品了解、审查资料到贷后管理',
+      improvements: '1. 备查档案（银行账户明细及对账单）清理尚未完成；2. 2025年贷款利息及费用发票清理在途，计划2026.04前完成',
+      collaboration: '跨部门沟通主动——与业务部门对接外汇单证规范、与金融机构沟通贷款事项'
+    },
+    career: { achievement: '', skills: '', direction: '', depth: '', willing: '', draining: '', resource: '', strengthQ: '', improveQ: '', supportQ: '' },
+    companyMsg: {
+      strategy: '2026年公司业务调整，贷款方案需随各单体公司需求调整优化',
+      teamExpectation: '资金管理规范化、档案管理常态化',
+      positioning: '资金管理核心岗，独立负责银行、外汇、贷款三条线'
+    },
+    workAdjust: {
+      before: '银行账户管理、外汇管理与审查、贷款业务（3家公司）',
+      after: '维持三条主线，新增：按季度清理备查档案，按季度清理贷款利息及财务费用发票',
+      newDuties: '1. 建立并执行季度档案清理机制；2. 2026年贷款方案优化（随业务调整主动规划）',
+      removed: '—（暂无明显调整）',
+      boundary: '外汇入账资料规范性——财务负责提示标准，业务负责提供合规单证',
+      contacts: '俄罗斯外汇、各金融机构对接人',
+      feedback: '□ 接受 □ 有顾虑 □ 抵触',
+      concern: '',
+      resolution: ''
+    },
+    salary: { finalRate: '', effectiveDate: '', adjustedSalary: '', feedback: '□ 接受 □ 低于预期 □ 需后续沟通', notes: '' },
+    followup: [
+      { task: '发出书面调薪确认', person: '', date: '', done: false },
+      { task: '发出调整后职责说明', person: '', date: '', done: false },
+      { task: '检查备查档案清理进度', person: '', date: '2026.Q1末', done: false },
+      { task: '检查贷款利息发票清理进度', person: '', date: '2026.04', done: false },
+      { task: '1个月后回访', person: '', date: '', done: false },
+    ],
+    summary2: {
+      overallState: '□ 积极 □ 稳定 □ 迷茫 □ 消极',
+      clarity: '□ 清晰 □ 有方向但模糊 □ 不明确',
+      acceptance: '□ 高 □ 中 □ 低',
+      focus: '',
+      risk: '',
+      notes: ''
+    }
+  },
+  {
+    id: 7,
+    name: '刘丽', dept: '财务核算岗（深圳主体）', entities: '深圳诊断、深圳医疗',
+    date: '2026-06-15', status: '已完成', statusType: 'done',
+    summary: '深圳双主体全模块核算，从发票到报表独立完成，业务差错被动修正占比大',
+    basicInfo: {
+      interviewer: '袁红', currentSalary: '', lastAdjust: '', proposedAdjust: '上浮 %，调整后薪资：'
+    },
+    performance: {
+      core: '1. 深圳诊断/医疗销售发票开具及应收单下推；2. 费用归集及凭证处理（含工资、社保、房租水电、长期待摊等）；3. 应付账款与采购发票处理，内部往来核对；4. 应收账款清理及收款单录入；5. 配合审计、盘点、代岗审单、凭证装订等',
+      highlights: '1. 覆盖深圳两家主体全模块核算，从发票到报表独立完成；2. 主动协助委外流程搭建（在途）；3. 灵活处理报税、报表等突发任务',
+      improvements: '1. 订单错误导致发票开错问题频发，需协同业务端解决；2. 工资表及账单（房租、水电、物流费）提供较晚，影响核算时效；3. 采购交票不规范——每次均有问题需返工；4. 收款单依赖台账，销售员信息变更不可控',
+      collaboration: '与深圳业务端、采购端高频互动，但多为被动处理差错'
+    },
+    career: { achievement: '', skills: '', direction: '', depth: '', willing: '', draining: '', resource: '', strengthQ: '', improveQ: '', supportQ: '' },
+    companyMsg: {
+      strategy: '深圳业务运营流程标准化、规范化；新增商务部门审核职能',
+      teamExpectation: '深圳端核算准确性、时效性提升',
+      positioning: '深圳主体核算核心岗，深圳端财务对口的稳定输出者'
+    },
+    workAdjust: {
+      before: '深圳诊断/医疗：发票+费用+应付+应收+审计配合+代岗',
+      after: '维持现有模块，优化工作方式',
+      newDuties: '1. 推动进项发票走线上流程，减少线下工作量；2. 收款单台账变更建立审批留痕机制；3. 新委外流程核算（待走通后）',
+      removed: '—（暂无明显调整）',
+      boundary: '采购发票规范性——采购部门负责准确提交，财务退回不规范单据；内部往来差异——需斯马特/普利泰/成都诊断同步入库时间；销售员信息变更——业务端通过审批留痕后通知财务',
+      contacts: '深圳采购岗、商务审核员（新）、斯马特/成都采购端',
+      feedback: '□ 接受 □ 有顾虑 □ 抵触',
+      concern: '',
+      resolution: ''
+    },
+    salary: { finalRate: '', effectiveDate: '', adjustedSalary: '', feedback: '□ 接受 □ 低于预期 □ 需后续沟通', notes: '' },
+    followup: [
+      { task: '发出书面调薪确认', person: '', date: '', done: false },
+      { task: '发出调整后职责说明', person: '', date: '', done: false },
+      { task: '进项发票线上化推进', person: '', date: '', done: false },
+      { task: '收款单变更审批机制建立', person: '', date: '', done: false },
+      { task: '1个月后回访', person: '', date: '', done: false },
+    ],
+    summary2: {
+      overallState: '□ 积极 □ 稳定 □ 迷茫 □ 消极',
+      clarity: '□ 清晰 □ 有方向但模糊 □ 不明确',
+      acceptance: '□ 高 □ 中 □ 低',
+      focus: '',
+      risk: '大量时间消耗在差错修正上（订单错误、发票返工），可能影响工作满意度',
+      notes: ''
+    }
+  },
+  {
+    id: 8,
+    name: '孙立宇', dept: '税务与收入岗', entities: '斯马特、普利泰、成都诊断',
+    date: '2026-06-15', status: '已完成', statusType: 'done',
+    summary: '税务与收入核心岗，税务筹划主动性强，IPO资料系统化梳理在途',
+    basicInfo: {
+      interviewer: '袁红', currentSalary: '', lastAdjust: '', proposedAdjust: '上浮 %，调整后薪资：'
+    },
+    performance: {
+      core: '1. 合规开具发票，每月核对金蝶与金税数据确保账实相符；2. 各类税费按期正确申报（增值税、所得税、印花税、房产税、土地税、工会经费等）；3. 定期核对内部交易往来数据，处理内部交易退货；4. 特殊业务处理——视同销售、未开票收入、三方协议、以旧换新',
+      highlights: '1. 税务专业能力强，主动规划税务筹划——合理安排内部交易进销冲减，降低频繁红冲的税务预警风险；2. 主动思考IPO过程中的收入数据准确性和资料准备；3. 主动关注并学习税收政策变化，计划系统性研究；4. 处理复杂内部交易——多物料编码税收编码赋值、普利泰进项少税负重问题分析',
+      improvements: '1. 深圳医疗开票时间紧任务重，手工核对费时；2. ERP取数4位小数 vs 金蝶2位小数差异需手工调整；3. 内部交易价格不准确需频繁处理，物料编码多需逐一手工修改；4. IPO所需资料的系统化梳理还未完成',
+      collaboration: '与订单组、仓库人员、采购端跨部门协作，推动开票效率提升'
+    },
+    career: { achievement: '', skills: '', direction: '', depth: '', willing: '', draining: '', resource: '', strengthQ: '', improveQ: '', supportQ: '' },
+    companyMsg: {
+      strategy: '2026年IPO关键年，税务合规和收入数据准确是审核重点',
+      teamExpectation: '税务风险防范前置、税务筹划主动化',
+      positioning: '税务与收入核心岗，IPO税务合规关键人'
+    },
+    workAdjust: {
+      before: '发票开具+收入确认+各类税务申报+内部交易往来核对',
+      after: '维持现有，加重IPO税务准备和流程标准化',
+      newDuties: '1. 按IPO节点梳理本岗位资料清单并系统归档；2. 系统性研究最新税收政策并落地到业务（研发费用加计扣除、增值税加计抵减等）；3. 推进ERP系统内部交易价格管控（禁止手工填价）——新版本上线后执行',
+      removed: '—（暂无明显调整）',
+      boundary: '内部交易价格——ERP系统由信息技术部管控，财务负责维护基准价；深圳开票时效——订单组保证报关单及时导出，财务按计划分三批开票',
+      contacts: '订单组、仓库、采购端、信息技术部',
+      feedback: '□ 接受 □ 有顾虑 □ 抵触',
+      concern: '',
+      resolution: ''
+    },
+    salary: { finalRate: '', effectiveDate: '', adjustedSalary: '', feedback: '□ 接受 □ 低于预期 □ 需后续沟通', notes: '' },
+    followup: [
+      { task: '发出书面调薪确认', person: '', date: '', done: false },
+      { task: '发出调整后职责说明', person: '', date: '', done: false },
+      { task: 'IPO税务资料清单梳理', person: '', date: '', done: false },
+      { task: 'ERP内部价格管控上线', person: '', date: '', done: false },
+      { task: '1个月后回访', person: '', date: '', done: false },
+    ],
+    summary2: {
+      overallState: '□ 积极 □ 稳定 □ 迷茫 □ 消极',
+      clarity: '□ 清晰 □ 有方向但模糊 □ 不明确',
+      acceptance: '□ 高 □ 中 □ 低',
+      focus: '',
+      risk: '手工处理量大（ERP小数差异、物料编码赋值），可能产生疲劳感；IPO节点税务压力增加',
+      notes: ''
+    }
+  },
+  {
+    id: 9,
+    name: '赵静', dept: '财务核算岗（资产及费用）', entities: '斯马特、普利泰、成都诊断',
+    date: '2026-06-15', status: '已完成', statusType: 'done',
+    summary: '资产及费用核算核心岗，2026年新增成本核算职责，单据规范为瓶颈',
+    basicInfo: {
+      interviewer: '袁红', currentSalary: '', lastAdjust: '', proposedAdjust: '上浮 %，调整后薪资：'
+    },
+    performance: {
+      core: '1. 完成各期费用审核、费用计提、费用分摊、费用核算，确保25年费用核算及时入账；2. 完成2025年度采购付款申请审核及付款账务处理；3. 完成退押金、退货款等退款审核；4. 完成固定资产账务处理，核对各科目及主体间对应关系；5. 完成部分在建工程转固工作，跟踪项目验收状态；6. 完成长期待摊费用、无形资产摊销、递延收益摊销、信用减值损失账务处理；7. 配合审计资料提供、业务部门查询、凭证整理装订',
+      highlights: '1. 跨3家公司主体完成资产及费用核算，核算完整性高；2. 主动跟踪在建工程验收状态，确保达到使用状态的资产及时验收；3. 非日常工作配合度高——审计、业务部门查询、凭证整理均能按时完成',
+      improvements: '1. 业务部门单据规范性问题频发——三公司间部门混淆、物资类别选择错误；2. 电子票据与纸质票据混用，进项抵扣单据未按要求提交一式两份；3. 资产验收单提交滞后，影响资产及时入账及跨公司转移准确性',
+      collaboration: '与后勤部门、业务部门频繁沟通单据规范问题，但多为被动纠错'
+    },
+    career: { achievement: '', skills: '', direction: '', depth: '', willing: '', draining: '', resource: '', strengthQ: '', improveQ: '', supportQ: '' },
+    companyMsg: {
+      strategy: '2026年IPO关键年，资产核算规范性、费用归集准确性是审计重点；新增成本核算职责',
+      teamExpectation: '资产核算规范化、费用审核效率提升、跨部门流程标准化',
+      positioning: '资产及费用核算核心岗，2026年新增成本核算职责'
+    },
+    workAdjust: {
+      before: '费用核算、采购付款审核、退款审核、固定资产及在建工程核算、长期待摊/无形资产/递延收益摊销、审计配合',
+      after: '原有职责 + **新增成本核算工作**',
+      newDuties: '1. **成本核算工作**——主动学习分析，掌握不同应用场景，系统学习公司成本核算体系；2. 建立与业务部门定期沟通机制，确保资产购置及时入账；3. 动态监控资产状态变更，明确权属关系；4. 优化长期待摊费用、无形资产摊销及递延收益核算模型',
+      removed: '—（暂无明显调整）',
+      boundary: '单据规范性——财务负责审核退回，业务部门负责按规范提交；资产验收——业务部门验收后立即提交单据至财务，避免先转移后验收；成本核算——由原有岗位（如罗羚榕已交接的斯马特成本核算）或其他来源承接，需明确具体分工',
+      contacts: '后勤部门（后勤管理中心/后勤办/食堂等）、采购部门、资产使用部门',
+      feedback: '□ 接受 □ 有顾虑 □ 抵触',
+      concern: '',
+      resolution: ''
+    },
+    salary: { finalRate: '', effectiveDate: '', adjustedSalary: '', feedback: '□ 接受 □ 低于预期 □ 需后续沟通', notes: '新增成本核算职责意味着工作范围扩大，需在面谈中明确培训支持和过渡期安排' },
+    followup: [
+      { task: '发出书面调薪确认', person: '', date: '', done: false },
+      { task: '发出调整后职责说明', person: '', date: '', done: false },
+      { task: '成本核算工作交接/培训', person: '', date: '', done: false },
+      { task: '单据规范培训机制建立', person: '', date: '', done: false },
+      { task: '资产验收流程优化落地', person: '', date: '', done: false },
+      { task: '1个月后回访', person: '', date: '', done: false },
+    ],
+    summary2: {
+      overallState: '□ 积极 □ 稳定 □ 迷茫 □ 消极',
+      clarity: '□ 清晰 □ 有方向但模糊 □ 不明确',
+      acceptance: '□ 高 □ 中 □ 低',
+      focus: '',
+      risk: '新增成本核算工作需明确培训支持和过渡期；单据规范问题长期存在，仅靠财务审核被动纠错效率低，需考虑制度层面解决方案（如系统校验、培训考核）',
+      notes: ''
+    }
+  },
+  {
+    id: 10,
+    name: '周素娟',
+    dept: '成本核算岗',
+    entities: '斯马特、普利泰、成都诊断',
+    date: '2026-06-16',
+    status: '待访谈',
+    statusType: 'pending',
+    summary: '三家公司成本核算全流程（工时审核+人工归集+研发分摊+成本核算+系统核验），2026年重点：IPO成本底稿+研发工时制度+ERP-云星空系统对接优化',
+    basicInfo: { interviewer: '韩毅', currentSalary: '', lastAdjust: '', proposedAdjust: '上浮 %，调整薪资：' },
+    performance: {
+      core: '一、研发/自动化/信息部门工时填报审核：审核研发、在建工程工时填报完整性，研发工时与考勤工时一致性验证，借调人员工时归属一致性检查。\n二、系统数据对接完整性核验：对ERP到云星空数据传输及完整性进行核验，确保业务与财务数据同步准确无遗漏。\n三、人工与借调费归集：人工成本多维度核算（财务科目+成本+产品线），通过统一Excel模板将多部门、多产品线薪酬要素归集整合。\n四、研发费分摊：对所有主体、全部项目按月精准分摊，严格核对研发工时等基础数据，确保研发支出归集真实完整合规。\n五、成本核算：试剂成本核算全流程，编制成本核算明细（含工资计提、社保公积金、成本结转明细）。',
+      highlights: '1.【模板化提效】设计统一Excel模板实现人工成本归集整合，实现多部门多产品线数据在一个平台统一计算分摊；\n2.【研发费标准化】建立覆盖全部研发项目按月精准分摊的标准流程，为加计扣除提供可靠支撑；\n3.【异常主动排查】在成都诊断借调普利泰人员未填制借调手续事件中，主动发现并推动补正，防止成本数据偏差；\n4.【系统核验闭环】持续跟踪ERP-云星空数据对接质量，主动识别计量单位不一致、数据重复统计等系统性问题。',
+      improvements: '一、研发工时方面：填报不及时——按制度要求考勤数据公布后1个工作日内完成，实际延迟3-4个工作日且需财务多次督促；数据一致性偏差——每月均有人员研发工时与考勤记录差异，借调人员工时归属每月出错。\n二、系统数据方面：ERP(按PCS)与云星空(按盒)计量单位不一致，需人工换算效率低；试剂与仪器数据分表统计，相同试剂出现在两个表中造成重复统计与归属不清。\n三、成本核算方面：试剂成本核算未及时完成，主因支撑核算的关键材料和人工费用数据提交过晚。\n四、人员归属方面：人工成本核算后期发现人员归属产线与产品生产有差异（如成都诊断未生产血气却有人工费归集）。',
+      collaboration: '研发部门（工时填报审核）、自动化/信息部门（工时填报督促）、信息技术部（ERP数据处理对接）、生产部门（人员归属确认）、后勤/采购部门（材料数据）'
+    },
+    career: { achievement: '', skills: '', direction: '', depth: '', willing: '', draining: '', resource: '', strengthQ: '', improveQ: '', supportQ: '' },
+    companyMsg: {
+      strategy: '2026年IPO关键年，研发端财务核算问题整改优化——研发费用加计扣除合规性、成本核算规范性、IPO底稿完整性是审计重点',
+      teamExpectation: '工时审核及时化、成本归集精准化、研发费用合规化、系统对接自动化、IPO底稿系统化',
+      positioning: '成本核算核心岗，三家公司成本数据中枢，研发费用加计扣除与IPO成本模块关键人'
+    },
+    workAdjust: {
+      before: '三家公司人工成本归集分摊 + 工时填报审核 + 系统数据对接核验 + 研发费用分摊 + 成本核算 + 产品核算 + 仪器投放 + 存货管理 + 采购管理 + 审计配合',
+      after: '一、推进制度落地：严格执行研发工时管理制度，明确各环节时效与责任；\n二、系统优化对接：推动ERP与云星空统一计量单位，将物料换算单位反写回ERP，减少手工核算；\n三、IPO准备：完成按项目/费用明细科目归集的研发底稿（人员人工、直接投入、折旧等），整理人员工时及立项报告；完成成本核算明细（工资计提表、社保公积金计算表、成本结转明细）；\n四、数据时效管理：梳理时间节点落实到相关责任人，提高核算效率；\n五、借调规范：提前与生产负责人沟通确定人员归属，确保数据准确性。',
+      newDuties: '1.【研发工时制度】推动工时填报纳入部门绩效考核，确保考勤公布后1个工作日内完成填报，为研发费用加计扣除和IPO提供可靠数据支撑；\n2.【ERP-云星空对接】与信息技术部协同完成计量单位统一、解决重复统计和归属不清问题；\n3.【IPO底稿】完成研发费用明细表和成本核算明细表的系统化梳理；\n4.【成本时效】倒逼上游数据，梳立各环节提交时间节点和责任人。',
+      removed: '—（核心职责不变，重点从日常核算转向制度优化+IPO准备）',
+      boundary: '研发工时——研发/自动化/信息部门确保报单真实及时（考勤公布后1个工作日内），财务负责审核+超时升级；ERP数据——信息技术部负责系统优化和单位统一，财务负责核对核验；人员归属——生产部门负责借调手续完整性，财务负责归集准确性验证；材料/人工数据——业务部门按约定时点提交，财务负责督促+超时反馈',
+      contacts: '研发部门、自动化部门、信息部门、信息技术部、生产/后勤部门、采购部门、人事部门（工时考勤）',
+      feedback: '□ 接受 □ 有顾虑 □ 抵触',
+      concern: '',
+      resolution: ''
+    },
+    salary: {
+      finalRate: '', effectiveDate: '', adjustedSalary: '',
+      feedback: '□ 接受 □ 低于预期 □ 需后续沟通',
+      notes: '成本核算覆盖三家公司全流程，且承担研发费用加计扣除和IPO底稿等高合规性要求工作'
+    },
+    followup: [
+      { task: '发出书面调薪确认', person: '', date: '', done: false },
+      { task: '发出调整后职责说明', person: '', date: '', done: false },
+      { task: 'IPO成本底稿梳理完成', person: '', date: '', done: false },
+      { task: '研发工时报单制度落地', person: '', date: '', done: false },
+      { task: 'ERP-金蝶数据核对机制优化', person: '', date: '', done: false },
+      { task: '1个月后回访', person: '', date: '', done: false }
+    ],
+    summary2: {
+      overallState: '□ 积极 □ 稳定 □ 迷茫 □ 消极',
+      clarity: '□ 清晰 □ 有方向但模糊 □ 不明确',
+      acceptance: '□ 高 □ 中 □ 低',
+      focus: '',
+      risk: '上游数据延迟是最大效率瓶颈（研发工时延迟3-4天需财务反复催促；ERP与云星空单位不一致需人工换算）；借调人员归属管控缺失导致每月成本数据偏差；IPO底稿准备期工作量显著增大；跨部门推动工时制度落地可能遇阻力',
+      notes: ''
+    }
+  }
+];
+
+let currentEmployeeId = null;
+let isEditMode = false;
+let originalData = null;
+var CLOUD_URL = 'https://jsonblob.com/api/jsonBlob/019ec98f-d52a-78f8-a152-963ecfdd4610';
+
+// Load: try cloud first, fallback to localStorage
+function loadData() {
+  fetch(CLOUD_URL).then(function(r){ return r.json(); }).then(function(d){
+    try {
+      var arr;
+      if (Array.isArray(d) && d.length > 0 && d[0].id) {
+        arr = d;
+      } else if (d && d.data) {
+        arr = (new Function('return ' + d.data))();
+      }
+      if (arr && arr.length > 0 && arr[0].id) {
+        EMPLOYEES = arr;
+        localStorage.setItem('smt_interview_data', JSON.stringify(EMPLOYEES));
+        renderRecordList();
+      }
+    } catch(e) {}
+  }).catch(function(){});
+}
+
+// Fallback: localStorage
+var savedData = localStorage.getItem('smt_interview_data');
+if (savedData) {
+  try { EMPLOYEES = JSON.parse(savedData); } catch(e) {}
+}
+
+function saveToStorage() {
+  localStorage.setItem('smt_interview_data', JSON.stringify(EMPLOYEES));
+  showToast('已保存到本地');
+}
+
+// ==============================
+// RENDER RECORD LIST
+// ==============================
+function renderRecordList(filter = '') {
+  const list = document.getElementById('recordList');
+  if (!list) { console.error('recordList element not found!'); return; }
+  const q = filter.toLowerCase();
+  const filtered = EMPLOYEES.filter(e =>
+    e.name.toLowerCase().includes(q) ||
+    e.dept.toLowerCase().includes(q) ||
+    e.entities.toLowerCase().includes(q)
+  );
+  console.log('renderRecordList: EMPLOYEES=' + EMPLOYEES.length + ', filtered=' + filtered.length);
+
+  // Build HTML manually to avoid template literal escaping issues
+  var html = '';
+  for (var i = 0; i < filtered.length; i++) {
+    var e = filtered[i];
+    var selP = e.statusType === 'pending' ? ' selected' : '';
+    var selA = e.statusType === 'active' ? ' selected' : '';
+    var selD = e.statusType === 'done' ? ' selected' : '';
+    html += '<div class="record-card" onclick="openDetail(' + e.id + ')">';
+    html += '<input type="checkbox" class="record-check" data-id="' + e.id + '" onclick="event.stopPropagation()" title="选择">';
+    html += '<div class="name-block">';
+    html += '<div class="name-edit" onclick="event.stopPropagation()">';
+    html += '<input value="' + escHtml(e.name) + '" onchange="updateEmployeeName(' + e.id + ', this.value)" title="点击编辑姓名">';
+    html += '<div class="edit-icon" title="编辑姓名"></div></div>';
+    html += '<div class="record-dept" onclick="event.stopPropagation()">';
+    html += '<input value="' + escHtml(e.dept) + '" onchange="updateEmployeeField(' + e.id + ', \'dept\', this.value)" title="点击编辑岗位">';
+    html += '</div></div>';
+    html += '<div class="record-date" onclick="event.stopPropagation()">';
+    html += '<input value="' + escHtml(e.entities) + '" onchange="updateEmployeeField(' + e.id + ', \'entities\', this.value)" title="点击编辑主体">';
+    html += '</div>';
+    html += '<div class="record-date" onclick="event.stopPropagation()">';
+    html += '<input value="' + escHtml(e.date) + '" onchange="updateEmployeeField(' + e.id + ', \'date\', this.value)" title="点击编辑日期">';
+    html += '</div>';
+    html += '<select class="status-select" onchange="updateEmployeeStatus(' + e.id + ', this.value)" onclick="event.stopPropagation()" title="选择状态">';
+    html += '<option value="pending"' + selP + '>待访谈</option>';
+    html += '<option value="active"' + selA + '>进行中</option>';
+    html += '<option value="done"' + selD + '>已完成</option>';
+    html += '</select>';
+    html += '<div class="record-note" onclick="event.stopPropagation()">';
+    html += '<input value="' + escHtml(e.summary) + '" onchange="updateEmployeeSummary(' + e.id + ', this.value)" title="点击编辑关键摘要" placeholder="输入关键摘要...">';
+    html += '</div>';
+    html += '<button class="btn-delete" onclick="event.stopPropagation();deleteEmployee(' + e.id + ')" title="删除">\u00D7</button>';
+    html += '</div>';
+  }
+  list.innerHTML = html;
+
+  var total = EMPLOYEES.length;
+  var pending = EMPLOYEES.filter(function(e){ return e.statusType === 'pending'; }).length;
+  var active = EMPLOYEES.filter(function(e){ return e.statusType === 'active'; }).length;
+  var done = EMPLOYEES.filter(function(e){ return e.statusType === 'done'; }).length;
+  document.querySelector('#screen-list .stats-row').innerHTML =
+    '<div class="stat-card"><span class="stat-label">谈话总数</span><span class="stat-value">' + total + '</span></div>' +
+    '<div class="stat-card"><span class="stat-label">待访谈</span><span class="stat-value">' + pending + '</span></div>' +
+    '<div class="stat-card"><span class="stat-label">进行中</span><span class="stat-value">' + active + '</span></div>' +
+    '<div class="stat-card"><span class="stat-label">已完成</span><span class="stat-value">' + done + '</span></div>';
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function updateEmployeeName(id, newName) {
+  const emp = EMPLOYEES.find(e => e.id === id);
+  if (emp && newName.trim()) {
+    emp.name = newName.trim();
+    renderRecordList(document.getElementById('searchInput')?.value || '');
+    saveToStorage();
+    showToast('员工姓名已更新');
+  }
+}
+
+function updateEmployeeField(id, field, value) {
+  const emp = EMPLOYEES.find(e => e.id === id);
+  if (emp && value.trim()) {
+    emp[field] = value.trim();
+    renderRecordList(document.getElementById('searchInput')?.value || '');
+    saveToStorage();
+    showToast('信息已更新');
+  }
+}
+
+function updateEmployeeStatus(id, newType) {
+  const emp = EMPLOYEES.find(e => e.id === id);
+  if (emp) {
+    emp.statusType = newType;
+    emp.status = newType === 'done' ? '已完成' : (newType === 'active' ? '进行中' : '待访谈');
+    renderRecordList(document.getElementById('searchInput')?.value || '');
+    saveToStorage();
+    showToast('状态已更新');
+  }
+}
+
+function updateEmployeeSummary(id, value) {
+  const emp = EMPLOYEES.find(e => e.id === id);
+  if (emp) {
+    emp.summary = value.trim();
+    saveToStorage();
+    showToast('摘要已更新');
+  }
+}
+
+function filterRecords() {
+  const q = document.getElementById('searchInput').value;
+  renderRecordList(q);
+}
+
+function deleteEmployee(id) {
+  var emp = EMPLOYEES.find(function(e){ return e.id === id; });
+  if (!emp) return;
+  if (!confirm('确定要删除「' + emp.name + '」的访谈记录吗？此操作不可撤销。')) return;
+  EMPLOYEES = EMPLOYEES.filter(function(e){ return e.id !== id; });
+  saveToStorage();
+  renderRecordList(document.getElementById('searchInput')?.value || '');
+  showToast('已删除「' + emp.name + '」');
+}
+
+// ==============================
+// DETAIL MODAL
+// ==============================
+function openDetail(id) {
+  currentEmployeeId = id;
+  isEditMode = false;
+  const emp = EMPLOYEES.find(e => e.id === id);
+  if (!emp) return;
+  originalData = JSON.parse(JSON.stringify(emp));
+
+  document.getElementById('modalTitle').textContent = '访谈记录 — ' + emp.name;
+  document.getElementById('btnEditSave').textContent = '编辑';
+  document.getElementById('btnEditSave').className = 'btn btn-outline btn-sm';
+  document.getElementById('btnCancel').style.display = 'none';
+  document.getElementById('modalInfo').textContent = emp.date + ' · 面谈人：' + emp.basicInfo.interviewer;
+
+  renderDetailContent(emp, false);
+  document.getElementById('detailModal').classList.add('show');
+}
+
+function closeDetail() {
+  document.getElementById('detailModal').classList.remove('show');
+  currentEmployeeId = null;
+  isEditMode = false;
+  renderRecordList(document.getElementById('searchInput')?.value || '');
+}
+
+function toggleEditMode() {
+  const emp = EMPLOYEES.find(e => e.id === currentEmployeeId);
+  if (!emp) return;
+
+  if (!isEditMode) {
+    isEditMode = true;
+    originalData = JSON.parse(JSON.stringify(emp));
+    document.getElementById('btnEditSave').textContent = '保存';
+    document.getElementById('btnEditSave').className = 'btn btn-primary btn-sm';
+    document.getElementById('btnCancel').style.display = 'inline-flex';
+    renderDetailContent(emp, true);
+  } else {
+    saveDetailChanges();
+    isEditMode = false;
+    document.getElementById('btnEditSave').textContent = '编辑';
+    document.getElementById('btnEditSave').className = 'btn btn-outline btn-sm';
+    document.getElementById('btnCancel').style.display = 'none';
+    renderDetailContent(emp, false);
+    showToast('访谈记录已保存');
+  }
+}
+
+function cancelEdit() {
+  const emp = EMPLOYEES.find(e => e.id === currentEmployeeId);
+  if (!emp || !originalData) return;
+  Object.assign(emp, originalData);
+  isEditMode = false;
+  document.getElementById('btnEditSave').textContent = '编辑';
+  document.getElementById('btnEditSave').className = 'btn btn-outline btn-sm';
+  document.getElementById('btnCancel').style.display = 'none';
+  renderDetailContent(emp, false);
+}
+
+function saveDetailChanges() {
+  const emp = EMPLOYEES.find(e => e.id === currentEmployeeId);
+  if (!emp) return;
+  const body = document.getElementById('modalBody');
+  const inputs = body.querySelectorAll('[data-field]');
+  inputs.forEach(inp => {
+    if (inp.type === 'radio' && !inp.checked) return;
+    const path = inp.dataset.field.split('.');
+    let obj = emp;
+    for (let i = 0; i < path.length - 1; i++) obj = obj[path[i]];
+    obj[path[path.length - 1]] = inp.value;
+  });
+  const checks = body.querySelectorAll('[data-followup]');
+  checks.forEach((chk, i) => {   emp.followup[i].done = chk.checked; });
+  saveToStorage();
+}
+
+function renderDetailContent(emp, editable) {
+  const body = document.getElementById('modalBody');
+  const e = editable;
+  body.innerHTML = `
+    <div class="detail-section">
+      <div class="detail-section-title">基本信息</div>
+      <div class="info-grid">
+        ${field('员工姓名', 'name', emp.name, e)}
+        ${field('所在岗位', 'dept', emp.dept, e)}
+        ${field('对应主体', 'entities', emp.entities, e)}
+        ${field('面谈日期', 'date', emp.date, e)}
+        ${field('面谈人', 'basicInfo.interviewer', emp.basicInfo.interviewer, e)}
+        ${field('拟调薪幅度', 'basicInfo.proposedAdjust', emp.basicInfo.proposedAdjust, e)}
+      </div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">一、绩效回顾 <span class="hint-tag" onclick="toggleHint(this)">▸ 话术参考</span></div>
+      <div class="hint-detail" style="display:none">用具体事实表达对员工价值的认可。每个肯定必须有事实支撑，杜绝空话。业绩好的多说业绩，稳健型的夸稳定性，协作型的夸担当。如果有明显短板，这里不提，留到后面工作调整环节。</div>
+      <table class="detail-table">
+        <tr><td>核心贡献</td><td>${area('performance.core', emp.performance.core, e)}</td></tr>
+        <tr><td>亮点表现</td><td>${area('performance.highlights', emp.performance.highlights, e, 3)}</td></tr>
+        <tr><td>待提升项</td><td>${area('performance.improvements', emp.performance.improvements, e, 3)}</td></tr>
+        <tr><td>团队协作</td><td>${area('performance.collaboration', emp.performance.collaboration, e)}</td></tr>
+      </table>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">二、职业规划（面谈中获取） <span class="hint-tag" onclick="toggleHint(this)">▸ 话术参考</span></div>
+      <div class="hint-detail" style="display:none">核心环节。摸清对方自我定位和发展意愿。多听少说，不要急于回应或承诺，先听完整。注意辨别真实想法和场面话。遇到迷茫型员工，用追问帮其梳理而非直接给答案。</div>
+      <table class="detail-table">
+        <tr><td>最有成就感的事</td><td>${area('career.achievement', emp.career.achievement, e)}<span class="hint-inline">追问：主要是因为结果本身，还是过程中的突破？</span></td></tr>
+        <tr><td>最擅长的三件事</td><td>${area('career.skills', emp.career.skills, e)}<span class="hint-inline">追问：如果让你定义最擅长的三件事，会是哪三件？</span></td></tr>
+        <tr><td>1-2年方向</td><td>${area('career.direction', emp.career.direction, e)}<span class="hint-inline">追问：希望一年后的自己和现在比有什么不一样？</span></td></tr>
+        <tr><td>倾向深度 or 宽度</td><td>${area('career.depth', emp.career.depth, e)}<span class="hint-inline">追问：现阶段更想在专业深度上深化，还是往管理/更宽领域走？</span></td></tr>
+        <tr><td>最愿投入的工作</td><td>${area('career.willing', emp.career.willing, e)}<span class="hint-inline">追问：哪一块你认为价值最高？</span></td></tr>
+        <tr><td>消耗大于收获的</td><td>${area('career.draining', emp.career.draining, e)}<span class="hint-inline">追问：花了很多精力但回报不够，如果重新分配你希望如何调整？</span></td></tr>
+        <tr><td>如有资源最想做</td><td>${area('career.resource', emp.career.resource, e)}<span class="hint-inline">追问：公司给你更大空间和资源，你最想做成哪件事？</span></td></tr>
+        <tr><td>哪些方面做得比较好</td><td>${area('career.strengthQ', emp.career.strengthQ, e)}<span class="hint-inline">引导：让员工总结自己的优势和做得好的地方，可整合到成就感问题中。</span></td></tr>
+        <tr><td>哪些方面可以做得更好</td><td>${area('career.improveQ', emp.career.improveQ, e)}<span class="hint-inline">引导：让员工自我反思提升空间，促进成长意识。</span></td></tr>
+        <tr><td>管理者可以做什么来支持你</td><td>${area('career.supportQ', emp.career.supportQ, e)}<span class="hint-inline">引导：开放式提问，了解员工对上级和管理层的期望与需求。</span></td></tr>
+      </table>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">三、公司方向传达</div>
+      <table class="detail-table">
+        <tr><td>公司/部门战略</td><td>${area('companyMsg.strategy', emp.companyMsg.strategy, e)}</td></tr>
+        <tr><td>对团队期望</td><td>${area('companyMsg.teamExpectation', emp.companyMsg.teamExpectation, e)}</td></tr>
+        <tr><td>对该员工定位</td><td>${area('companyMsg.positioning', emp.companyMsg.positioning, e)}</td></tr>
+      </table>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">四、工作内容调整 <span class="hint-tag" onclick="toggleHint(this)">▸ 话术参考</span></div>
+      <div class="hint-detail" style="display:none">调整方向尽量与员工职业规划挂钩，形成呼应。职责边界必须说清楚。涉及跨部门协作时，提前理清接口人和协作边界。不确定的部分直接说「这块我们还在设计中，后续再跟你同步」。</div>
+      <table class="detail-table">
+        <tr><td>调整前职责</td><td>${area('workAdjust.before', emp.workAdjust.before, e)}</td></tr>
+        <tr><td>调整后职责</td><td>${area('workAdjust.after', emp.workAdjust.after, e)}</td></tr>
+        <tr><td>新增职责</td><td>${area('workAdjust.newDuties', emp.workAdjust.newDuties, e, 3)}</td></tr>
+        <tr><td>不再负责</td><td>${area('workAdjust.removed', emp.workAdjust.removed, e)}</td></tr>
+        <tr><td>职责边界</td><td>${area('workAdjust.boundary', emp.workAdjust.boundary, e, 3)}</td></tr>
+        <tr><td>协作接口人</td><td>${area('workAdjust.contacts', emp.workAdjust.contacts, e)}</td></tr>
+        <tr><td>员工反馈</td><td>${fieldCheck(e, 'workAdjust.feedback', emp.workAdjust.feedback, ['接受','有顾虑','抵触'])}</td></tr>
+      </table>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">五、调薪结果 <span class="hint-tag" onclick="toggleHint(this)">▸ 话术参考</span></div>
+      <div class="hint-detail" style="display:none">先铺垫认可和方向，最后才报数字。把调薪和工作调整明确关联——「涨薪是因为你要做更多/更重的事」。不要用「争取来的」「帮你申请的」这类施恩话术。对方有异议时先听完理由，不当场讨价还价，说「你的想法我理解，我回去综合看一下」。</div>
+      <table class="detail-table">
+        <tr><td>调薪幅度</td><td>${field2('salary.finalRate', emp.salary.finalRate, e)}</td></tr>
+        <tr><td>生效时间</td><td>${field2('salary.effectiveDate', emp.salary.effectiveDate, e)}</td></tr>
+        <tr><td>调整薪资</td><td>${field2('salary.adjustedSalary', emp.salary.adjustedSalary, e)}</td></tr>
+        <tr><td>员工反馈</td><td>${fieldCheck(e, 'salary.feedback', emp.salary.feedback, ['接受','低于预期','需后续沟通'])}</td></tr>
+        <tr><td>备注</td><td>${area('salary.notes', emp.salary.notes, e)}</td></tr>
+      </table>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">六、后续跟进</div>
+      <div class="followup-list">
+        ${emp.followup.map((f, i) => `
+          <div class="followup-item">
+            <span class="followup-task">${e ? '<input class="edit-input" data-field="followup.'+i+'.task" value="'+f.task+'" />' : f.task}</span>
+            <span class="followup-person">${e ? '<input class="edit-input" data-field="followup.'+i+'.person" value="'+f.person+'" />' : f.person}</span>
+            <span class="followup-date">${e ? '<input class="edit-input" data-field="followup.'+i+'.date" value="'+f.date+'" />' : f.date}</span>
+            <span class="followup-status">${e ? '<input type="checkbox" class="followup-checkbox" data-followup="'+i+'" '+(f.done?'checked':'')+' />' : (f.done ? '已完成' : '待办')}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">七、面谈总结 <span class="hint-tag" onclick="toggleHint(this)">▸ 话术参考</span></div>
+      <div class="hint-detail" style="display:none">总结共识（职业方向+职责边界+调薪），确认后续安排。「你不是在替我干活，你是在为自己积累。我希望你在SMT的每一天，都在为你的简历增加分量。」</div>
+      <table class="detail-table">
+        <tr><td>员工整体状态</td><td>${fieldCheck(e, 'summary2.overallState', emp.summary2.overallState, ['积极','稳定','迷茫','消极'])}</td></tr>
+        <tr><td>发展规划清晰度</td><td>${fieldCheck(e, 'summary2.clarity', emp.summary2.clarity, ['清晰','有方向但模糊','不明确'])}</td></tr>
+        <tr><td>对调整接受度</td><td>${fieldCheck(e, 'summary2.acceptance', emp.summary2.acceptance, ['高','中','低'])}</td></tr>
+        <tr><td>核心关注点</td><td>${area('summary2.focus', emp.summary2.focus, e)}</td></tr>
+        <tr><td>风险提示</td><td>${area('summary2.risk', emp.summary2.risk, e, 3)}</td></tr>
+        <tr><td>面谈人备注</td><td>${area('summary2.notes', emp.summary2.notes, e)}</td></tr>
+      </table>
+    </div>
+  `;
+}
+
+function field(label, dataField, value, editable) {
+  return '<div class="info-item"><span class="info-label">'+label+'</span>'+(editable
+    ? '<input class="info-value" data-field="'+dataField+'" value="'+value+'" />'
+    : '<div class="info-value-readonly">'+(value||'—')+'</div>')+'</div>';
+}
+
+function field2(dataField, value, editable) {
+  return editable ? '<input class="edit-input" data-field="'+dataField+'" value="'+(value||'')+'" style="width:100%;" />'
+    : '<div class="readonly-text">'+(value||'—')+'</div>';
+}
+
+function area(dataField, value, editable, rows) {
+  rows = rows || 2;
+  return editable ? '<textarea data-field="'+dataField+'" style="width:100%;min-height:'+(rows*24)+'px;border:1px solid var(--border);outline:none;font-size:14px;font-family:var(--font);color:var(--fg);background:var(--bg);padding:6px 8px;resize:vertical;">'+(value||'')+'</textarea>'
+    : '<div class="readonly-text">'+(value||'—')+'</div>';
+}
+
+function fieldCheck(editable, dataField, value, options) {
+  var selected = value || '';
+  if (!editable) {
+    // 只读模式：高亮已选项
+    var parts = [];
+    for (var i = 0; i < options.length; i++) {
+      var sel = selected.indexOf(options[i]) >= 0;
+      parts.push('<span class="chk-option'+(sel?' chk-sel':'')+'">'+(sel?'●':'○')+' '+options[i]+'</span>');
+    }
+    return '<div class="readonly-text chk-group">'+parts.join(' ')+'</div>';
+  }
+  // 编辑模式：可点击 radio 组
+  var idPrefix = dataField.replace(/\\./g,'_')+'_'+Math.random().toString(36).substr(2,6);
+  var parts = [];
+  for (var i = 0; i < options.length; i++) {
+    var id = idPrefix+'_'+i;
+    var sel = selected.indexOf(options[i]) >= 0;
+    parts.push('<label class="chk-label"><input type="radio" name="'+idPrefix+'" value="'+options[i]+'" data-field="'+dataField+'" '+ (sel?'checked':'') +' /> '+options[i]+'</label>');
+  }
+  return '<div class="chk-group">'+parts.join('')+'</div>';
+}
+
+function openNewRecord() {
+  // 创建空白模板作为新员工记录
+  var newId = Math.max.apply(null, EMPLOYEES.map(function(e){return e.id;})) + 1;
+  var newEmp = {
+    id: newId,
+    name: '新员工', dept: '请编辑岗位', entities: '请编辑主体',
+    date: new Date().toISOString().slice(0,10), status: '进行中', statusType: 'active',
+    summary: '新建谈话记录，点击编辑填写详情',
+    basicInfo: { interviewer: '', currentSalary:'', lastAdjust:'', proposedAdjust: '' },
+    performance: { core: '', highlights: '', improvements: '', collaboration: '' },
+    career: { achievement:'', skills:'', direction:'', depth:'', willing:'', draining:'', resource:'', strengthQ:'', improveQ:'', supportQ:'' },
+    companyMsg: { strategy: '', teamExpectation: '', positioning: '' },
+    workAdjust: { before:'', after:'', newDuties:'', removed:'', boundary:'', contacts:'', feedback:'□ 接受 □ 有顾虑 □ 抵触', concern:'', resolution:'' },
+    salary: { finalRate:'', effectiveDate:'', adjustedSalary:'', feedback:'□ 接受 □ 低于预期 □ 需后续沟通', notes:'' },
+    followup: [
+      { task:'发出书面调薪确认', person:'', date:'', done:false },
+      { task:'发出调整后职责说明', person:'', date:'', done:false },
+      { task:'1个月后回访', person:'', date:'', done:false }
+    ],
+    summary2: { overallState:'□ 积极 □ 稳定 □ 迷茫 □ 消极', clarity:'□ 清晰 □ 有方向但模糊 □ 不明确', acceptance:'□ 高 □ 中 □ 低', focus:'', risk:'', notes:'' }
+  };
+  EMPLOYEES.push(newEmp);
+  saveToStorage();
+  renderRecordList(document.getElementById('searchInput')?.value || '');
+  openDetail(newId);
+  // 自动进入编辑模式
+  setTimeout(function(){ toggleEditMode(); }, 300);
+  showToast('已创建新记录，请编辑详情');
+}
+
+function exportSelected() {
+  var ids = getSelectedIds();
+  if (ids.length === 0) { showToast('请先勾选要导出的记录'); return; }
+  var selected = EMPLOYEES.filter(function(e){ return ids.indexOf(e.id) >= 0; });
+  var data = JSON.stringify(selected, null, 2);
+  var blob = new Blob([data], {type: 'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = '调薪面谈记录_部分_' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('已导出 ' + selected.length + ' 条记录');
+}
+
+function getSelectedIds() {
+  var checks = document.querySelectorAll('.record-check:checked');
+  var ids = [];
+  checks.forEach(function(c){ ids.push(parseInt(c.dataset.id)); });
+  return ids;
+}
+
+function toggleSelectAll() {
+  var checks = document.querySelectorAll('.record-check');
+  var allChecked = checks.length > 0 && document.querySelectorAll('.record-check:checked').length === checks.length;
+  checks.forEach(function(c){ c.checked = !allChecked; });
+  document.getElementById('btnSelectAll').textContent = allChecked ? '全选' : '取消';
+}
+
+function importSelected(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var imported = JSON.parse(e.target.result);
+      if (!Array.isArray(imported)) imported = [imported];
+      if (imported.length === 0) throw new Error('Empty');
+      
+      // Merge: update existing by id, add new ones
+      var added = 0, updated = 0;
+      imported.forEach(function(emp){
+        var existing = EMPLOYEES.find(function(e){ return e.id === emp.id; });
+        if (existing) {
+          Object.assign(existing, emp);
+          updated++;
+        } else {
+          // Ensure unique id
+          var maxId = Math.max.apply(null, EMPLOYEES.map(function(e){return e.id;}));
+          emp.id = maxId + 1;
+          EMPLOYEES.push(emp);
+          added++;
+        }
+      });
+      
+      saveToStorage();
+      renderRecordList(document.getElementById('searchInput')?.value || '');
+      showToast('已导入：更新'+updated+'条，新增'+added+'条');
+    } catch(err) {
+      alert('导入失败：文件格式不正确，请选择导出的 JSON 文件。');
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2000);
+}
+
+function toggleHint(el) {
+  var detail = el.parentElement.nextElementSibling;
+  if (!detail || !detail.classList.contains('hint-detail')) return;
+  if (detail.style.display === 'none') {
+    detail.style.display = 'block';
+    el.textContent = '▾ 话术参考';
+  } else {
+    detail.style.display = 'none';
+    el.textContent = '▸ 话术参考';
+  }
+}
+
+function scaleApp() {
+  const wrapper = document.getElementById('app');
+  const scale = Math.min(window.innerWidth / 1440, 1);
+  wrapper.style.transform = 'scale('+scale+')';
+  wrapper.style.width = '1440px';
+}
+window.addEventListener('resize', scaleApp);
+
+renderRecordList();
+loadData();  // fetch latest from cloud
+setTimeout(scaleApp, 50);
+
+document.getElementById('detailModal').addEventListener('click', function(e) {
+  if (e.target === this) closeDetail();
+});
+</script>
+</body>
+</html>
