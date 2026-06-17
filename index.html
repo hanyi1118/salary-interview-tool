@@ -307,6 +307,7 @@ body { font-family: var(--font); background: var(--fg); overflow: hidden; width:
         <div class="btn-group">
           <button class="btn btn-outline btn-sm" onclick="toggleSelectAll()" style="height:44px;margin-right:4px;" id="btnSelectAll">全选</button>
           <button class="btn btn-outline btn-sm" onclick="exportSelected()" style="height:44px;margin-right:4px;">导出选中</button>
+          <button class="btn btn-outline btn-sm" onclick="pullFromCloud()" style="height:44px;margin-right:4px;">拉取云端</button>
           <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()" style="height:44px;margin-right:4px;">导入</button>
           <input type="file" id="importFile" accept=".json" style="display:none" onchange="importSelected(this)">
           <button class="btn btn-primary" onclick="openNewRecord()"><div class="btn-icon"></div><span>新建谈话</span></button>
@@ -367,28 +368,49 @@ let EMPLOYEES = [];
 let currentEmployeeId = null;
 let isEditMode = false;
 let originalData = null;
-var DATA_URL = 'data.json?_=' + Date.now();
+var DATA_URL = 'data.json';
 
-// Load: try GitHub Pages data.json first, fallback to localStorage
+// Load: localStorage ALWAYS takes priority. Cloud is only for first-time or manual pull.
+// First, load from localStorage
+var savedData = localStorage.getItem('smt_interview_data');
+if (savedData) {
+  try { EMPLOYEES = JSON.parse(savedData); } catch(e) {}
+}
+
+// Load cloud data ONLY if no local data exists (first visit)
 function loadData() {
+  // Only auto-sync if localStorage is empty (first-time visitor)
+  if (savedData) return;
+  
   fetch(DATA_URL).then(function(r){ return r.json(); }).then(function(arr){
     try {
       if (arr && Array.isArray(arr) && arr.length > 0 && arr[0].id) {
         EMPLOYEES = arr;
         localStorage.setItem('smt_interview_data', JSON.stringify(EMPLOYEES));
         renderRecordList();
-        showToast('已同步云端数据');
+        showToast('已加载云端数据');
       }
     } catch(e) {}
   }).catch(function(e){
-    console.log('Cloud load failed, using localStorage');
+    console.log('Cloud load failed');
   });
 }
 
-// Fallback: localStorage
-var savedData = localStorage.getItem('smt_interview_data');
-if (savedData) {
-  try { EMPLOYEES = JSON.parse(savedData); } catch(e) {}
+// Manual cloud pull (user-initiated)
+function pullFromCloud() {
+  if (!confirm('从云端拉取将覆盖本地修改，确定继续？')) return;
+  fetch(DATA_URL).then(function(r){ return r.json(); }).then(function(arr){
+    try {
+      if (arr && Array.isArray(arr) && arr.length > 0 && arr[0].id) {
+        EMPLOYEES = arr;
+        localStorage.setItem('smt_interview_data', JSON.stringify(EMPLOYEES));
+        renderRecordList();
+        showToast('已从云端同步');
+      }
+    } catch(e) {}
+  }).catch(function(e){
+    showToast('云端同步失败，请检查网络');
+  });
 }
 
 function saveToStorage() {
