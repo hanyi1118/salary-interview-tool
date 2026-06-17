@@ -532,8 +532,8 @@
     "dept": "资金管理岗（银行账户/外汇/贷款）",
     "entities": "斯马特、普利泰、成都诊断",
     "date": "2026-06-15",
-    "status": "待访谈",
-    "statusType": "pending",
+    "status": "已完成",
+    "statusType": "done",
     "summary": "资金管理核心岗，独立负责银行/外汇/贷款三条线，贷款全流程自主管理",
     "basicInfo": {
       "interviewer": "袁红",
@@ -629,8 +629,8 @@
     "dept": "财务核算岗（深圳主体）",
     "entities": "深圳诊断、深圳医疗",
     "date": "2026-06-15",
-    "status": "待访谈",
-    "statusType": "pending",
+    "status": "已完成",
+    "statusType": "done",
     "summary": "深圳双主体全模块核算，从发票到报表独立完成，业务差错被动修正占比大",
     "basicInfo": {
       "interviewer": "袁红",
@@ -726,8 +726,8 @@
     "dept": "税务与收入岗",
     "entities": "斯马特、普利泰、成都诊断",
     "date": "2026-06-15",
-    "status": "待访谈",
-    "statusType": "pending",
+    "status": "已完成",
+    "statusType": "done",
     "summary": "税务与收入核心岗，税务筹划主动性强，IPO资料系统化梳理在途",
     "basicInfo": {
       "interviewer": "袁红",
