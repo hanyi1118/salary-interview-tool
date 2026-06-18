@@ -272,6 +272,32 @@ body { font-family: var(--font); background: var(--fg); overflow: hidden; width:
 ::-webkit-scrollbar-thumb { background: var(--border); }
 ::-webkit-scrollbar-thumb:hover { background: var(--sidebar-muted); }
 
+/* ===== Ledger Table ===== */
+.ledger-table-wrap {
+  flex: 1; overflow: auto; background: var(--card);
+  border: 1px solid var(--border);
+}
+.ledger-table {
+  width: 100%; border-collapse: collapse; font-size: 13px; font-family: var(--font);
+  min-width: 1400px;
+}
+.ledger-table thead { position: sticky; top: 0; z-index: 2; }
+.ledger-table th {
+  background: var(--fg); color: #FFF; font-weight: 500; text-align: left;
+  padding: 10px 8px; white-space: nowrap; position: sticky; top: 0;
+}
+.ledger-table td {
+  padding: 8px; border-bottom: 1px solid var(--border);
+  color: var(--text-secondary); vertical-align: top; max-width: 160px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ledger-table td.wrap { white-space: normal; max-width: 200px; }
+.ledger-table tr:hover td { background: var(--muted); }
+.ledger-tag { display: inline-block; padding: 2px 8px; font-size: 11px; font-weight: 500; }
+.ledger-tag-done { background: #ECFDF5; color: var(--accent); }
+.ledger-tag-active { background: var(--primary-light); color: var(--primary); }
+.ledger-tag-pending { background: #FFF7ED; color: #EA580C; }
+
 /* ===== Toast ===== */
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
@@ -290,11 +316,14 @@ body { font-family: var(--font); background: var(--fg); overflow: hidden; width:
     <div class="sidebar">
       <div class="sidebar-logo">SMT 面谈助手</div>
       <div class="sidebar-divider"></div>
-      <div class="nav-item active" data-target="list">
+      <div class="nav-item active" data-target="list" onclick="showScreen('list')">
         <div class="nav-icon"></div><span class="nav-text">谈话记录</span>
       </div>
       <div class="nav-item" data-target="form" onclick="openNewRecord()">
         <div class="nav-icon"></div><span class="nav-text">新建谈话</span>
+      </div>
+      <div class="nav-item" data-target="ledger" onclick="showScreen('ledger')">
+        <div class="nav-icon"></div><span class="nav-text">部门台账</span>
       </div>
       <div class="sidebar-spacer"></div>
         <div class="user-area">
@@ -334,6 +363,51 @@ body { font-family: var(--font); background: var(--fg); overflow: hidden; width:
         <span class="list-col col-note">关键摘要</span>
       </div>
       <div class="record-list" id="recordList"></div>
+    </div>
+  </div>
+
+  <!-- ======================== SCREEN 2: Department Ledger ======================== -->
+  <div class="screen" id="screen-ledger">
+    <div class="sidebar">
+      <div class="sidebar-logo">SMT 面谈助手</div>
+      <div class="sidebar-divider"></div>
+      <div class="nav-item" data-target="list" onclick="showScreen('list')">
+        <div class="nav-icon"></div><span class="nav-text">谈话记录</span>
+      </div>
+      <div class="nav-item" data-target="form" onclick="openNewRecord()">
+        <div class="nav-icon"></div><span class="nav-text">新建谈话</span>
+      </div>
+      <div class="nav-item active" data-target="ledger" onclick="showScreen('ledger')">
+        <div class="nav-icon"></div><span class="nav-text">部门台账</span>
+      </div>
+      <div class="sidebar-spacer"></div>
+        <div class="user-area">
+        <div class="avatar"></div><span class="user-name">SMT财务</span>
+      </div>
+    </div>
+    <div class="main-content">
+      <div class="header-bar">
+        <span class="page-title">部门沟通台账</span>
+        <div class="btn-group">
+          <button class="btn btn-outline btn-sm" onclick="exportLedgerCSV()" style="height:44px;margin-right:4px;">导出Excel</button>
+          <button class="btn btn-outline btn-sm" onclick="pullFromCloud()" style="height:44px;">拉取云端</button>
+        </div>
+      </div>
+      <div class="ledger-table-wrap">
+        <table class="ledger-table" id="ledgerTable">
+          <thead>
+            <tr>
+              <th>序号</th><th>姓名</th><th>岗位</th><th>对应主体</th>
+              <th>访谈日期</th><th>状态</th><th>访谈人</th>
+              <th>调薪幅度</th><th>调整薪资</th>
+              <th>工作调整反馈</th><th>调薪结果反馈</th>
+              <th>整体状态</th><th>明确度</th><th>接受度</th>
+              <th>关注点</th><th>风险/备注</th>
+            </tr>
+          </thead>
+          <tbody id="ledgerTbody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -877,6 +951,115 @@ function scaleApp() {
   const scale = Math.min(window.innerWidth / 1440, 1);
   wrapper.style.transform = 'scale('+scale+')';
   wrapper.style.width = '1440px';
+}
+
+// ==============================
+// SCREEN SWITCHING
+// ==============================
+function showScreen(name) {
+  // Hide all screens
+  var screens = document.querySelectorAll('.screen');
+  for (var i = 0; i < screens.length; i++) {
+    screens[i].classList.remove('active');
+  }
+  // Show target screen
+  document.getElementById('screen-' + name).classList.add('active');
+  // Update sidebar nav
+  document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active'); });
+  document.querySelector('.nav-item[data-target="' + name + '"]').classList.add('active');
+  if (name === 'ledger') renderLedger();
+  if (name === 'list') renderRecordList();
+}
+
+// ==============================
+// LEDGER TABLE
+// ==============================
+function renderLedger() {
+  var tbody = document.getElementById('ledgerTbody');
+  if (!tbody) return;
+  var html = '';
+  for (var i = 0; i < EMPLOYEES.length; i++) {
+    var e = EMPLOYEES[i];
+    var wf = (e.workAdjust && e.workAdjust.feedback) ? (e.workAdjust.feedback.replace(/\n/g,'<br>')) : '';
+    var sf = (e.salary && e.salary.feedback) ? e.salary.feedback : '';
+    var os = (e.summary2 && e.summary2.overallState) ? e.summary2.overallState : '';
+    var cl = (e.summary2 && e.summary2.clarity) ? e.summary2.clarity : '';
+    var ac = (e.summary2 && e.summary2.acceptance) ? e.summary2.acceptance : '';
+    var fc = (e.summary2 && e.summary2.focus) ? e.summary2.focus : '';
+    var rk = (e.summary2 && e.summary2.risk) ? e.summary2.risk : '';
+    var tagClass = e.statusType === 'done' ? 'ledger-tag-done' : (e.statusType === 'active' ? 'ledger-tag-active' : 'ledger-tag-pending');
+
+    html += '<tr>';
+    html += '<td>' + (i+1) + '</td>';
+    html += '<td><strong>' + e.name + '</strong></td>';
+    html += '<td>' + e.dept + '</td>';
+    html += '<td>' + e.entities + '</td>';
+    html += '<td>' + e.date + '</td>';
+    html += '<td><span class="ledger-tag ' + tagClass + '">' + e.status + '</span></td>';
+    html += '<td>' + (e.basicInfo ? e.basicInfo.interviewer : '') + '</td>';
+    html += '<td>' + (e.salary ? e.salary.finalRate : '') + '</td>';
+    html += '<td>' + (e.salary ? e.salary.adjustedSalary : '') + '</td>';
+    html += '<td class="wrap">' + wf + '</td>';
+    html += '<td>' + sf + '</td>';
+    html += '<td>' + os + '</td>';
+    html += '<td>' + cl + '</td>';
+    html += '<td>' + ac + '</td>';
+    html += '<td class="wrap">' + fc + '</td>';
+    html += '<td class="wrap">' + rk + '</td>';
+    html += '</tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+// ==============================
+// EXPORT LEDGER TO CSV (Excel)
+// ==============================
+function exportLedgerCSV() {
+  var BOM = '\uFEFF';
+  var header = '序号,姓名,岗位,对应主体,访谈日期,状态,访谈人,调薪幅度,调整薪资,工作调整反馈,调薪结果反馈,整体状态,明确度,接受度,关注点,风险点';
+  var rows = [header];
+  
+  for (var i = 0; i < EMPLOYEES.length; i++) {
+    var e = EMPLOYEES[i];
+    var row = [
+      i + 1,
+      e.name,
+      e.dept,
+      e.entities,
+      e.date,
+      e.status,
+      e.basicInfo ? e.basicInfo.interviewer : '',
+      e.salary ? e.salary.finalRate : '',
+      e.salary ? e.salary.adjustedSalary : '',
+      (e.workAdjust && e.workAdjust.feedback) ? e.workAdjust.feedback : '',
+      (e.salary && e.salary.feedback) ? e.salary.feedback : '',
+      (e.summary2 && e.summary2.overallState) ? e.summary2.overallState : '',
+      (e.summary2 && e.summary2.clarity) ? e.summary2.clarity : '',
+      (e.summary2 && e.summary2.acceptance) ? e.summary2.acceptance : '',
+      (e.summary2 && e.summary2.focus) ? e.summary2.focus : '',
+      (e.summary2 && e.summary2.risk) ? e.summary2.risk : ''
+    ];
+    rows.push(row.map(function(cell) {
+      // Escape CSV: wrap in quotes if contains comma, newline, or quote
+      var s = String(cell).replace(/\n/g, '; ');
+      if (s.indexOf(',') >= 0 || s.indexOf('"') >= 0) {
+        s = '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    }).join(','));
+  }
+  
+  var csv = BOM + rows.join('\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = '部门沟通台账_' + new Date().toISOString().substring(0,10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('台账已导出');
 }
 window.addEventListener('resize', scaleApp);
 
