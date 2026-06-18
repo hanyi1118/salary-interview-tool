@@ -279,19 +279,22 @@ body { font-family: var(--font); background: var(--fg); overflow: hidden; width:
 }
 .ledger-table {
   width: 100%; border-collapse: collapse; font-size: 13px; font-family: var(--font);
-  min-width: 1400px;
+  min-width: 2800px;
 }
 .ledger-table thead { position: sticky; top: 0; z-index: 2; }
 .ledger-table th {
   background: var(--fg); color: #FFF; font-weight: 500; text-align: left;
   padding: 10px 8px; white-space: nowrap; position: sticky; top: 0;
 }
+.ledger-table th.ledger-section {
+  background: var(--secondary); text-align: center; font-size: 12px; padding: 6px 4px;
+}
 .ledger-table td {
   padding: 8px; border-bottom: 1px solid var(--border);
-  color: var(--text-secondary); vertical-align: top; max-width: 160px;
+  color: var(--text-secondary); vertical-align: top; max-width: 200px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.ledger-table td.wrap { white-space: normal; max-width: 200px; }
+.ledger-table td.wrap { white-space: normal; max-width: 250px; }
 .ledger-table tr:hover td { background: var(--muted); }
 .ledger-tag { display: inline-block; padding: 2px 8px; font-size: 11px; font-weight: 500; }
 .ledger-tag-done { background: #ECFDF5; color: var(--accent); }
@@ -399,10 +402,20 @@ body { font-family: var(--font); background: var(--fg); overflow: hidden; width:
             <tr>
               <th>序号</th><th>姓名</th><th>岗位</th><th>对应主体</th>
               <th>访谈日期</th><th>状态</th><th>访谈人</th>
-              <th>调薪幅度</th><th>调整薪资</th>
-              <th>工作调整反馈</th><th>调薪结果反馈</th>
+              <th class="ledger-section">绩效回顾</th>
+              <th>核心工作</th><th>工作亮点</th><th>待改进</th>
+              <th class="ledger-section">职业规划</th>
+              <th>成就感</th><th>优势技能</th><th>发展方向</th>
+              <th class="ledger-section">工作调整</th>
+              <th>调整前职责</th><th>调整后职责</th><th>新增职责</th>
+              <th class="ledger-section">调薪</th>
+              <th>调薪幅度</th><th>生效时间</th><th>调整薪资</th>
+              <th>工作反馈</th><th>调薪反馈</th><th>备注</th>
+              <th class="ledger-section">面谈总结</th>
               <th>整体状态</th><th>明确度</th><th>接受度</th>
-              <th>关注点</th><th>风险/备注</th>
+              <th>关注点</th><th>风险点</th>
+              <th class="ledger-section">跟进</th>
+              <th>跟进事项</th><th>关键摘要</th>
             </tr>
           </thead>
           <tbody id="ledgerTbody"></tbody>
@@ -980,32 +993,58 @@ function renderLedger() {
   var html = '';
   for (var i = 0; i < EMPLOYEES.length; i++) {
     var e = EMPLOYEES[i];
-    var wf = (e.workAdjust && e.workAdjust.feedback) ? (e.workAdjust.feedback.replace(/\n/g,'<br>')) : '';
-    var sf = (e.salary && e.salary.feedback) ? e.salary.feedback : '';
-    var os = (e.summary2 && e.summary2.overallState) ? e.summary2.overallState : '';
-    var cl = (e.summary2 && e.summary2.clarity) ? e.summary2.clarity : '';
-    var ac = (e.summary2 && e.summary2.acceptance) ? e.summary2.acceptance : '';
-    var fc = (e.summary2 && e.summary2.focus) ? e.summary2.focus : '';
-    var rk = (e.summary2 && e.summary2.risk) ? e.summary2.risk : '';
+    var perf = e.performance || {};
+    var car = e.career || {};
+    var wa = e.workAdjust || {};
+    var sal = e.salary || {};
+    var s2 = e.summary2 || {};
+    var cm = e.companyMsg || {};
     var tagClass = e.statusType === 'done' ? 'ledger-tag-done' : (e.statusType === 'active' ? 'ledger-tag-active' : 'ledger-tag-pending');
+
+    // Followup summary
+    var fu = '';
+    if (e.followup && e.followup.length > 0) {
+      fu = e.followup.map(function(f){ return (f.done ? '✓' : '○') + f.task; }).join('<br>');
+    }
+
+    function td(v, w) { return '<td' + (w ? ' class="wrap"' : '') + '>' + (v || '') + '</td>'; }
 
     html += '<tr>';
     html += '<td>' + (i+1) + '</td>';
-    html += '<td><strong>' + e.name + '</strong></td>';
-    html += '<td>' + e.dept + '</td>';
-    html += '<td>' + e.entities + '</td>';
-    html += '<td>' + e.date + '</td>';
+    html += '<td><strong>' + escHtml(e.name) + '</strong></td>';
+    html += td(escHtml(e.dept));
+    html += td(escHtml(e.entities));
+    html += td(escHtml(e.date));
     html += '<td><span class="ledger-tag ' + tagClass + '">' + e.status + '</span></td>';
-    html += '<td>' + (e.basicInfo ? e.basicInfo.interviewer : '') + '</td>';
-    html += '<td>' + (e.salary ? e.salary.finalRate : '') + '</td>';
-    html += '<td>' + (e.salary ? e.salary.adjustedSalary : '') + '</td>';
-    html += '<td class="wrap">' + wf + '</td>';
-    html += '<td>' + sf + '</td>';
-    html += '<td>' + os + '</td>';
-    html += '<td>' + cl + '</td>';
-    html += '<td>' + ac + '</td>';
-    html += '<td class="wrap">' + fc + '</td>';
-    html += '<td class="wrap">' + rk + '</td>';
+    html += td(escHtml(e.basicInfo ? e.basicInfo.interviewer : ''));
+    html += '<td class="ledger-section-wrap">&nbsp;</td>';
+    html += td(escHtml(perf.core), true);
+    html += td(escHtml(perf.highlights), true);
+    html += td(escHtml(perf.improvements), true);
+    html += '<td class="ledger-section-wrap">&nbsp;</td>';
+    html += td(escHtml(car.achievement), true);
+    html += td(escHtml(car.skills), true);
+    html += td(escHtml(car.direction), true);
+    html += '<td class="ledger-section-wrap">&nbsp;</td>';
+    html += td(escHtml(wa.before), true);
+    html += td(escHtml(wa.after), true);
+    html += td(escHtml(wa.newDuties), true);
+    html += '<td class="ledger-section-wrap">&nbsp;</td>';
+    html += td(escHtml(sal.finalRate));
+    html += td(escHtml(sal.effectiveDate));
+    html += td(escHtml(sal.adjustedSalary));
+    html += td(escHtml(wa.feedback));
+    html += td(escHtml(sal.feedback));
+    html += td(escHtml(sal.notes), true);
+    html += '<td class="ledger-section-wrap">&nbsp;</td>';
+    html += td(escHtml(s2.overallState));
+    html += td(escHtml(s2.clarity));
+    html += td(escHtml(s2.acceptance));
+    html += td(escHtml(s2.focus), true);
+    html += td(escHtml(s2.risk), true);
+    html += '<td class="ledger-section-wrap">&nbsp;</td>';
+    html += td(fu, true);
+    html += td(escHtml(e.summary), true);
     html += '</tr>';
   }
   tbody.innerHTML = html;
@@ -1016,31 +1055,35 @@ function renderLedger() {
 // ==============================
 function exportLedgerCSV() {
   var BOM = '\uFEFF';
-  var header = '序号,姓名,岗位,对应主体,访谈日期,状态,访谈人,调薪幅度,调整薪资,工作调整反馈,调薪结果反馈,整体状态,明确度,接受度,关注点,风险点';
+  var header = '序号,姓名,岗位,对应主体,访谈日期,状态,访谈人,核心工作,工作亮点,待改进,成就感,优势技能,发展方向,调整前职责,调整后职责,新增职责,调薪幅度,生效时间,调整薪资,工作反馈,调薪反馈,薪资备注,整体状态,明确度,接受度,关注点,风险点,跟进事项,关键摘要';
   var rows = [header];
   
   for (var i = 0; i < EMPLOYEES.length; i++) {
     var e = EMPLOYEES[i];
+    var perf = e.performance || {};
+    var car = e.career || {};
+    var wa = e.workAdjust || {};
+    var sal = e.salary || {};
+    var s2 = e.summary2 || {};
+    var fu = '';
+    if (e.followup && e.followup.length > 0) {
+      fu = e.followup.map(function(f){ return (f.done ? '[完成]' : '[待办]') + f.task; }).join('; ');
+    }
+
     var row = [
       i + 1,
-      e.name,
-      e.dept,
-      e.entities,
-      e.date,
-      e.status,
+      e.name, e.dept, e.entities, e.date, e.status,
       e.basicInfo ? e.basicInfo.interviewer : '',
-      e.salary ? e.salary.finalRate : '',
-      e.salary ? e.salary.adjustedSalary : '',
-      (e.workAdjust && e.workAdjust.feedback) ? e.workAdjust.feedback : '',
-      (e.salary && e.salary.feedback) ? e.salary.feedback : '',
-      (e.summary2 && e.summary2.overallState) ? e.summary2.overallState : '',
-      (e.summary2 && e.summary2.clarity) ? e.summary2.clarity : '',
-      (e.summary2 && e.summary2.acceptance) ? e.summary2.acceptance : '',
-      (e.summary2 && e.summary2.focus) ? e.summary2.focus : '',
-      (e.summary2 && e.summary2.risk) ? e.summary2.risk : ''
+      perf.core || '', perf.highlights || '', perf.improvements || '',
+      car.achievement || '', car.skills || '', car.direction || '',
+      wa.before || '', wa.after || '', wa.newDuties || '',
+      sal.finalRate || '', sal.effectiveDate || '', sal.adjustedSalary || '',
+      wa.feedback || '', sal.feedback || '', sal.notes || '',
+      s2.overallState || '', s2.clarity || '', s2.acceptance || '',
+      s2.focus || '', s2.risk || '',
+      fu, e.summary || ''
     ];
     rows.push(row.map(function(cell) {
-      // Escape CSV: wrap in quotes if contains comma, newline, or quote
       var s = String(cell).replace(/\n/g, '; ');
       if (s.indexOf(',') >= 0 || s.indexOf('"') >= 0) {
         s = '"' + s.replace(/"/g, '""') + '"';
